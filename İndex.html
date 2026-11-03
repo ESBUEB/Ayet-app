@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Ayet & Hadis</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  
+  <style>
+    body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+    .font-arabic { font-family: 'Amiri', serif; }
+    .bg-overlay { background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.85) 100%); }
+    
+    @keyframes heartPop {
+      0% { transform: scale(0) translate(-50%, -50%); opacity: 0; }
+      50% { transform: scale(1.2) translate(-50%, -50%); opacity: 1; }
+      100% { transform: scale(1) translate(-50%, -50%); opacity: 0; }
+    }
+    .heart-animation {
+      position: absolute; top: 50%; left: 50%;
+      transform-origin: 0 0;
+      animation: heartPop 0.8s ease-out forwards;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="bg-black text-white h-screen w-screen overflow-hidden select-none">
+
+  <!-- Arka Plan Görseli -->
+  <div id="bg-image" class="absolute inset-0 bg-cover bg-center transition-all duration-700 scale-105" 
+       style="background-image: url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1000');">
+  </div>
+  
+  <!-- Gölgelendirme Katmanı -->
+  <div class="absolute inset-0 bg-overlay"></div>
+
+  <!-- Beğen / Bismillah Animasyon Alanı -->
+  <div id="anim-container" class="absolute inset-0 pointer-events-none z-50"></div>
+
+  <!-- Ana Kart Konteyner -->
+  <div id="app" class="relative z-10 h-full w-full flex flex-col justify-between p-6 max-w-md mx-auto">
+    
+    <!-- Üst Başlık -->
+    <div class="text-center pt-8">
+      <span class="bg-black/40 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-semibold tracking-widest uppercase border border-white/10 text-amber-300">
+        Günün Hikmeti
+      </span>
+    </div>
+
+    <!-- Orta Alan: Arapça ve Türkçe Metin -->
+    <div class="my-auto text-center space-y-6 px-2">
+      <p id="arabic-text" class="font-arabic text-2xl md:text-3xl text-amber-200 leading-relaxed dir-rtl opacity-0 transition-opacity duration-500">
+        Yükleniyor...
+      </p>
+      
+      <p id="turkish-text" class="text-lg md:text-xl font-medium text-white/95 leading-snug opacity-0 transition-opacity duration-500">
+        Veriler getiriliyor, lütfen bekleyin...
+      </p>
+    </div>
+
+    <!-- Alt Alan: Kaynak ve Bilgi -->
+    <div class="pb-10 text-center space-y-3">
+      <div id="source-text" class="text-sm font-semibold text-white/75 bg-black/30 backdrop-blur-sm py-1.5 px-4 rounded-lg inline-block border border-white/5">
+        -
+      </div>
+      <p class="text-[10px] text-white/40 tracking-wider">Sonraki için ekrana dokunun veya yukarı kaydırın</p>
+    </div>
+
+  </div>
+
+  <script>
+    // GitHub Raw CSV Linkin veya E-Tablo Bağlantın:
+    const CSV_URL = "https://raw.githubusercontent.com/ESBUEB/Ayet-app/main/veri.csv"; 
+
+    const BG_IMAGES = [
+      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1000",
+      "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=1000",
+      "https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1000",
+      "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=1000",
+      "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=1000"
+    ];
+
+    let dataset = [];
+    let startY = 0;
+
+    function loadData() {
+      Papa.parse(CSV_URL, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+          dataset = results.data;
+          showRandomCard();
+        },
+        error: function(err) {
+          document.getElementById('turkish-text').innerText = "Veri yükleniyor veya link bekleniyor...";
+        }
+      });
+    }
+
+    function showRandomCard() {
+      if (!dataset || dataset.length === 0) return;
+
+      const arabicEl = document.getElementById('arabic-text');
+      const turkishEl = document.getElementById('turkish-text');
+      const sourceEl = document.getElementById('source-text');
+      const bgEl = document.getElementById('bg-image');
+
+      arabicEl.style.opacity = 0;
+      turkishEl.style.opacity = 0;
+
+      setTimeout(() => {
+        const item = dataset[Math.floor(Math.random() * dataset.length)];
+
+        arabicEl.innerText = item['Arapça Yazi'] || item['Arapca'] || '';
+        turkishEl.innerText = item['Türkçe Yazi'] || item['Turkce'] || '';
+        
+        const sure = item['Sure İsmi'] || item['Sure'] || '';
+        const ayet = item['Sure numarası'] || item['Ayet Numarası'] || item['Ayet'] || '';
+        sourceEl.innerText = sure ? `${sure} Suresi, ${ayet}. Ayet` : (item['Kaynak'] || 'Kur\'an-ı Kerim');
+
+        const randomBg = BG_IMAGES[Math.floor(Math.random() * BG_IMAGES.length)];
+        bgEl.style.backgroundImage = `url('${randomBg}')`;
+
+        arabicEl.style.opacity = 1;
+        turkishEl.style.opacity = 1;
+      }, 300);
+    }
+
+    // Tıklama / Kaydırma Olayları
+    window.addEventListener('click', () => showRandomCard());
+    window.addEventListener('touchstart', e => { startY = e.touches[0].clientY; });
+    window.addEventListener('touchend', e => {
+      const deltaY = startY - e.changedTouches[0].clientY;
+      if (Math.abs(deltaY) > 30) {
+        showRandomCard();
+      }
+    });
+
+    // Çift Tıklama Bismillah Animasyonu
+    let lastTap = 0;
+    window.addEventListener('touchend', e => {
+      const currentTime = new Date().getTime();
+      const tapLength = currentTime - lastTap;
+      if (tapLength < 300 && tapLength > 0) {
+        showLikeAnimation(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+      }
+      lastTap = currentTime;
+    });
+
+    function showLikeAnimation(x, y) {
+      const container = document.getElementById('anim-container');
+      const el = document.createElement('div');
+      el.className = 'heart-animation text-amber-300 font-bold text-3xl font-arabic drop-shadow-lg';
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
+      el.innerText = 'بِسْمِ ٱللَّهِ';
+      container.appendChild(el);
+      setTimeout(() => el.remove(), 800);
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
