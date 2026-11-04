@@ -36,7 +36,7 @@
   <!-- Gölgelendirme Katmanı -->
   <div class="absolute inset-0 bg-overlay"></div>
 
-  <!-- Beğen / Bismillah Animasyon Alanı -->
+  <!-- Bismillah Animasyon Alanı -->
   <div id="anim-container" class="absolute inset-0 pointer-events-none z-50"></div>
 
   <!-- Ana Kart Konteyner -->
@@ -51,11 +51,11 @@
 
     <!-- Orta Alan: Arapça ve Türkçe Metin -->
     <div class="my-auto text-center space-y-6 px-2">
-      <p id="arabic-text" class="font-arabic text-2xl md:text-3xl text-amber-200 leading-relaxed dir-rtl opacity-0 transition-opacity duration-500">
+      <p id="arabic-text" class="font-arabic text-2xl md:text-3xl text-amber-200 leading-relaxed dir-rtl transition-opacity duration-500">
         Yükleniyor...
       </p>
       
-      <p id="turkish-text" class="text-lg md:text-xl font-medium text-white/95 leading-snug opacity-0 transition-opacity duration-500">
+      <p id="turkish-text" class="text-lg md:text-xl font-medium text-white/95 leading-snug transition-opacity duration-500">
         Veriler getiriliyor, lütfen bekleyin...
       </p>
     </div>
@@ -71,8 +71,8 @@
   </div>
 
   <script>
-    // GitHub Raw CSV Linkin veya E-Tablo Bağlantın:
-    const CSV_URL = "https://raw.githubusercontent.com/ESBUEB/Ayet-app/main/veri.csv"; 
+    // Aynı dizindeki veri.csv dosyasını doğrudan çağırıyoruz
+    const CSV_URL = "./veri.csv"; 
 
     const BG_IMAGES = [
       "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1000",
@@ -85,19 +85,30 @@
     let dataset = [];
     let startY = 0;
 
-    function loadData() {
-      Papa.parse(CSV_URL, {
-        download: true,
-        header: true,
-        skipEmptyLines: true,
-        complete: function(results) {
-          dataset = results.data;
-          showRandomCard();
-        },
-        error: function(err) {
-          document.getElementById('turkish-text').innerText = "Veri yükleniyor veya link bekleniyor...";
+    async function loadData() {
+      try {
+        const response = await fetch(CSV_URL);
+        if (!response.ok) {
+          throw new Error("veri.csv bulunamadı! Lütfen dosyayı GitHub'a yüklediğinizden emin olun.");
         }
-      });
+        const csvText = await response.text();
+        
+        Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+          complete: function(results) {
+            dataset = results.data;
+            if (dataset.length > 0) {
+              showRandomCard();
+            } else {
+              document.getElementById('turkish-text').innerText = "veri.csv dosyasının içi boş görünüyor.";
+            }
+          }
+        });
+      } catch (error) {
+        document.getElementById('arabic-text').innerText = "";
+        document.getElementById('turkish-text').innerText = error.message;
+      }
     }
 
     function showRandomCard() {
@@ -114,12 +125,15 @@
       setTimeout(() => {
         const item = dataset[Math.floor(Math.random() * dataset.length)];
 
-        arabicEl.innerText = item['Arapça Yazi'] || item['Arapca'] || '';
-        turkishEl.innerText = item['Türkçe Yazi'] || item['Turkce'] || '';
+        // Farklı sütun ismi yazımlarına karşı esnek kontrol
+        arabicEl.innerText = item['Arapça Yazi'] || item['Arapca Yazi'] || item['Arapça'] || '';
+        turkishEl.innerText = item['Türkçe Yazı'] || item['Türkçe Yazi'] || item['Turkce Yazi'] || item['Icerik'] || 'Metin okunamadı';
         
-        const sure = item['Sure İsmi'] || item['Sure'] || '';
-        const ayet = item['Sure numarası'] || item['Ayet Numarası'] || item['Ayet'] || '';
-        sourceEl.innerText = sure ? `${sure} Suresi, ${ayet}. Ayet` : (item['Kaynak'] || 'Kur\'an-ı Kerim');
+        const sure = item['Sure İsmi'] || item['Sure Ismi'] || item['Sure'] || '';
+        const ayet = item['Ayet Numarası'] || item['Sure numarası'] || item['Ayet'] || '';
+        const kaynak = item['Kaynak'] || 'Kur\'an-ı Kerim';
+        
+        sourceEl.innerText = sure ? `${sure} Suresi ${ayet ? ', ' + ayet + '. Ayet' : ''}` : kaynak;
 
         const randomBg = BG_IMAGES[Math.floor(Math.random() * BG_IMAGES.length)];
         bgEl.style.backgroundImage = `url('${randomBg}')`;
