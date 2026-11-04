@@ -109,8 +109,7 @@
       navigator.serviceWorker.register('./sw.js').catch(function() {});
     }
 
-    // Önbellek engelini aşmak için dinamik URL
-    var CSV_URL = "./veri.csv?t=" + new Date().getTime(); 
+    var CSV_URL = "./veri.csv?v=" + new Date().getTime(); 
 
     var BG_IMAGES = [
       "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1000",
@@ -120,7 +119,9 @@
       "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=1000",
       "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?q=80&w=1000",
       "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?q=80&w=1000",
-      "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=1000"
+      "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=1000",
+      "https://images.unsplash.com/photo-1505118380757-91f5f5632de0?q=80&w=1000",
+      "https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=1000"
     ];
 
     var dataset = [];
@@ -132,7 +133,7 @@
     async function loadData() {
       try {
         var response = await fetch(CSV_URL);
-        if (!response.ok) throw new Error("veri.csv bulunamadı! Dosya adının tam olarak 'veri.csv' olduğundan emin olun.");
+        if (!response.ok) throw new Error("veri.csv dosyası okunamadı!");
         var csvText = await response.text();
         
         Papa.parse(csvText, {
@@ -144,7 +145,7 @@
               rebuildDeck();
               renderContent();
             } else {
-              document.getElementById('turkish-text').innerText = "veri.csv yüklendi fakat içeriği boş veya ayrıştırılamadı.";
+              document.getElementById('turkish-text').innerText = "veri.csv dosyası boş veya okunamıyor.";
             }
           }
         });
@@ -154,214 +155,9 @@
       }
     }
 
-    // OTOMATİK VE AKILLI SÜTUN TESPİT EDİCİ
     function extractRowData(item) {
       var keys = Object.keys(item);
       var arabic = '', turkish = '', sure = '', ayet = '', kaynak = '';
 
-      // Standart bilinen başlıklar
       arabic = item['Arapça Yazi'] || item['Arapca Yazi'] || item['Arapça'] || item['Arapca'] || item['Arabic'] || '';
-      turkish = item['Türkçe Yazı'] || item['Türkçe Yazi'] || item['Turkce Yazi'] || item['Icerik'] || item['Meal'] || item['Turkish'] || item['Metin'] || '';
-      sure = item['Sure İsmi'] || item['Sure Ismi'] || item['Sure'] || item['Surah'] || '';
-      ayet = item['Ayet Numarası'] || item['Sure numarası'] || item['Ayet No'] || item['Ayet'] || item['Verse'] || '';
-      kaynak = item['Kaynak'] || item['Source'] || '';
-
-      // Başlıklar eşleşmediyse içeriğe bakarak Arapça ve Türkçe metni kendisi bulur
-      if (!arabic || !turkish) {
-        for (var i = 0; i < keys.length; i++) {
-          var val = (item[keys[i]] || '').toString().trim();
-          if (!val) continue;
-
-          // Arapça karakter tespiti (Unicode regex)
-          if (!arabic && /[\u0600-\u06FF]/.test(val)) {
-            arabic = val;
-          } else if (!turkish && val.length > 5 && val !== arabic) {
-            turkish = val;
-          }
-        }
-      }
-
-      return { arabic: arabic, turkish: turkish, sure: sure, ayet: ayet, kaynak: kaynak };
-    }
-
-    function rebuildDeck() {
-      deck = [];
-      for (var i = 0; i < dataset.length; i++) deck.push(i);
-      for (var j = deck.length - 1; j > 0; j--) {
-        var r = Math.floor(Math.random() * (j + 1));
-        var temp = deck[j];
-        deck[j] = deck[r];
-        deck[r] = temp;
-      }
-    }
-
-    function getNextItem() {
-      if (deck.length === 0) rebuildDeck();
-      var index = deck.pop();
-      return dataset[index];
-    }
-
-    function renderContent() {
-      if (!dataset || dataset.length === 0) return;
-      resetActionButtons();
-      
-      var rawItem = getNextItem();
-      var parsed = extractRowData(rawItem);
-
-      document.getElementById('arabic-text').innerText = parsed.arabic || '';
-      document.getElementById('turkish-text').innerText = parsed.turkish || 'Metin sütunu okunamadı';
-      
-      var sureInfo = parsed.sure ? parsed.sure + ' Suresi ' + (parsed.ayet ? ', ' + parsed.ayet + '. Ayet' : '') : (parsed.kaynak || 'Kur\'an-ı Kerim');
-      document.getElementById('source-text').innerText = sureInfo;
-
-      document.getElementById('bg-image').style.backgroundImage = 'url("' + getRandomBg() + '")';
-    }
-
-    function getRandomBg() {
-      var nextIndex;
-      do {
-        nextIndex = Math.floor(Math.random() * BG_IMAGES.length);
-      } while (nextIndex === lastBgIndex && BG_IMAGES.length > 1);
-      lastBgIndex = nextIndex;
-      return BG_IMAGES[nextIndex];
-    }
-
-    function resetActionButtons() {
-      isLiked = false; isSaved = false;
-      var heartIcon = document.getElementById('heart-icon');
-      var likeBg = document.getElementById('like-bg');
-      heartIcon.setAttribute('fill', 'none');
-      heartIcon.setAttribute('stroke', 'currentColor');
-      likeBg.className = "p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white transition-all";
-
-      var bookmarkIcon = document.getElementById('bookmark-icon');
-      var saveBg = document.getElementById('save-bg');
-      bookmarkIcon.setAttribute('fill', 'none');
-      bookmarkIcon.setAttribute('stroke', 'currentColor');
-      saveBg.className = "p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white transition-all";
-    }
-
-    function toggleLike(e) {
-      e.stopPropagation();
-      isLiked = !isLiked;
-      var heartIcon = document.getElementById('heart-icon');
-      var likeBg = document.getElementById('like-bg');
-      if (isLiked) {
-        heartIcon.setAttribute('fill', '#ef4444'); heartIcon.setAttribute('stroke', '#ef4444');
-        likeBg.className = "p-3 bg-red-500/30 backdrop-blur-md rounded-full border border-red-500/50 text-red-400 transition-all";
-      } else {
-        heartIcon.setAttribute('fill', 'none'); heartIcon.setAttribute('stroke', 'currentColor');
-        likeBg.className = "p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white transition-all";
-      }
-    }
-
-    function toggleSave(e) {
-      e.stopPropagation();
-      isSaved = !isSaved;
-      var bookmarkIcon = document.getElementById('bookmark-icon');
-      var saveBg = document.getElementById('save-bg');
-      if (isSaved) {
-        bookmarkIcon.setAttribute('fill', '#f59e0b'); bookmarkIcon.setAttribute('stroke', '#f59e0b');
-        saveBg.className = "p-3 bg-amber-500/30 backdrop-blur-md rounded-full border border-amber-500/50 text-amber-400 transition-all";
-      } else {
-        bookmarkIcon.setAttribute('fill', 'none'); bookmarkIcon.setAttribute('stroke', 'currentColor');
-        saveBg.className = "p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white transition-all";
-      }
-    }
-
-    // --- ULTRA AKICI SÜRGÜ FİZİĞİ ---
-    var card = document.getElementById('card-content');
-    var startY = 0;
-    var currentY = 0;
-    var isDragging = false;
-    var isAnimating = false;
-
-    function triggerNextCard() {
-      if (isAnimating) return;
-      isAnimating = true;
-
-      card.style.transition = 'transform 0.25s ease-out, opacity 0.2s ease-out';
-      card.style.transform = 'translate3d(0, -90px, 0) scale(0.92)';
-      card.style.opacity = '0';
-
-      setTimeout(function() {
-        renderContent();
-        card.style.transition = 'none';
-        card.style.transform = 'translate3d(0, 70px, 0) scale(0.95)';
-        
-        requestAnimationFrame(function() {
-          requestAnimationFrame(function() {
-            card.style.transition = 'transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.2), opacity 0.3s ease';
-            card.style.transform = 'translate3d(0, 0, 0) scale(1)';
-            card.style.opacity = '1';
-            setTimeout(function() { isAnimating = false; }, 350);
-          });
-        });
-      }, 200);
-    }
-
-    window.addEventListener('touchstart', function(e) {
-      if (isAnimating) return;
-      startY = e.touches[0].clientY;
-      currentY = startY;
-      isDragging = true;
-      card.style.transition = 'none';
-    }, { passive: true });
-
-    window.addEventListener('touchmove', function(e) {
-      if (!isDragging || isAnimating) return;
-      currentY = e.touches[0].clientY;
-      var deltaY = currentY - startY;
-
-      if (deltaY < 0) {
-        var progress = Math.min(Math.abs(deltaY) / 200, 1);
-        card.style.transform = 'translate3d(0, ' + deltaY + 'px, 0) scale(' + (1 - progress * 0.05) + ')';
-        card.style.opacity = (1 - progress * 0.7).toFixed(2);
-      }
-    }, { passive: true });
-
-    window.addEventListener('touchend', function() {
-      if (!isDragging || isAnimating) return;
-      isDragging = false;
-      var deltaY = currentY - startY;
-
-      if (deltaY < -45) {
-        triggerNextCard();
-      } else {
-        card.style.transition = 'transform 0.3s ease-out, opacity 0.25s ease';
-        card.style.transform = 'translate3d(0, 0, 0) scale(1)';
-        card.style.opacity = '1';
-      }
-    });
-
-    // Çift Tıklama Bismillah Animasyonu & Tıklama Geçişi
-    var lastTap = 0;
-    window.addEventListener('click', function(e) {
-      if (e.target.closest('#like-btn') || e.target.closest('#save-btn')) return;
-      var currentTime = new Date().getTime();
-      var tapLength = currentTime - lastTap;
-      if (tapLength < 300 && tapLength > 0) {
-        showLikeAnimation(e.clientX, e.clientY);
-      } else {
-        if (!isDragging && Math.abs(currentY - startY) < 5) {
-          triggerNextCard();
-        }
-      }
-      lastTap = currentTime;
-    });
-
-    function showLikeAnimation(x, y) {
-      var container = document.getElementById('anim-container');
-      var el = document.createElement('div');
-      el.className = 'heart-animation text-amber-300 font-bold text-3xl font-arabic drop-shadow-lg';
-      el.style.left = x + 'px';
-      el.style.top = y + 'px';
-      el.innerText = 'بِسْمِ ٱللَّهِ';
-      container.appendChild(el);
-      setTimeout(function() { el.remove(); }, 800);
-    }
-
-    loadData();
-  </script>
-</body>
-</html>
+      turkish = item['Türkçe Yaz
