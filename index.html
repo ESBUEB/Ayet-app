@@ -13,7 +13,6 @@
     .font-arabic { font-family: 'Amiri', serif; }
     .bg-overlay { background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.85) 100%); }
     
-    /* Reels Tarzı Dikey Kayma Animasyonları */
     .card-anim {
       transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
     }
@@ -52,6 +51,29 @@
   <!-- Bismillah Animasyon Alanı -->
   <div id="anim-container" class="absolute inset-0 pointer-events-none z-50"></div>
 
+  <!-- Sağ Yan Aksiyon Menüsü (Beğen & Kaydet) -->
+  <div class="absolute right-4 bottom-28 z-30 flex flex-col items-center space-y-6">
+    <!-- Beğen Butonu -->
+    <button id="like-btn" onclick="toggleLike(event)" class="flex flex-col items-center space-y-1 group focus:outline-none">
+      <div id="like-bg" class="p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white group-active:scale-125 transition-all">
+        <svg id="heart-icon" class="w-6 h-6 fill-none stroke-current stroke-2 transition-colors" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+        </svg>
+      </div>
+      <span class="text-[10px] font-semibold text-white/80 drop-shadow">Beğen</span>
+    </button>
+
+    <!-- Kaydet Butonu -->
+    <button id="save-btn" onclick="toggleSave(event)" class="flex flex-col items-center space-y-1 group focus:outline-none">
+      <div id="save-bg" class="p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white group-active:scale-125 transition-all">
+        <svg id="bookmark-icon" class="w-6 h-6 fill-none stroke-current stroke-2 transition-colors" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
+        </svg>
+      </div>
+      <span class="text-[10px] font-semibold text-white/80 drop-shadow">Kaydet</span>
+    </button>
+  </div>
+
   <!-- Ana Kart Konteyner -->
   <div id="app" class="relative z-10 h-full w-full flex flex-col justify-between p-6 max-w-md mx-auto">
     
@@ -63,7 +85,7 @@
     </div>
 
     <!-- Orta Alan (Animasyonlu Kart) -->
-    <div id="card-content" class="card-anim my-auto text-center space-y-6 px-2">
+    <div id="card-content" class="card-anim my-auto text-center space-y-6 px-2 pr-10">
       <p id="arabic-text" class="font-arabic text-2xl md:text-3xl text-amber-200 leading-relaxed dir-rtl">
         Yükleniyor...
       </p>
@@ -97,6 +119,8 @@
     let dataset = [];
     let startY = 0;
     let isAnimating = false;
+    let isLiked = false;
+    let isSaved = false;
 
     async function loadData() {
       try {
@@ -117,6 +141,57 @@
       }
     }
 
+    function resetActionButtons() {
+      isLiked = false;
+      isSaved = false;
+
+      const heartIcon = document.getElementById('heart-icon');
+      const likeBg = document.getElementById('like-bg');
+      heartIcon.setAttribute('fill', 'none');
+      heartIcon.setAttribute('stroke', 'currentColor');
+      likeBg.classList.remove('bg-red-500/30', 'border-red-500/50', 'text-red-400');
+
+      const bookmarkIcon = document.getElementById('bookmark-icon');
+      const saveBg = document.getElementById('save-bg');
+      bookmarkIcon.setAttribute('fill', 'none');
+      bookmarkIcon.setAttribute('stroke', 'currentColor');
+      saveBg.classList.remove('bg-amber-500/30', 'border-amber-500/50', 'text-amber-400');
+    }
+
+    function toggleLike(e) {
+      e.stopPropagation();
+      isLiked = !isLiked;
+      const heartIcon = document.getElementById('heart-icon');
+      const likeBg = document.getElementById('like-bg');
+
+      if (isLiked) {
+        heartIcon.setAttribute('fill', '#ef4444');
+        heartIcon.setAttribute('stroke', '#ef4444');
+        likeBg.classList.add('bg-red-500/30', 'border-red-500/50', 'text-red-400');
+      } else {
+        heartIcon.setAttribute('fill', 'none');
+        heartIcon.setAttribute('stroke', 'currentColor');
+        likeBg.classList.remove('bg-red-500/30', 'border-red-500/50', 'text-red-400');
+      }
+    }
+
+    function toggleSave(e) {
+      e.stopPropagation();
+      isSaved = !isSaved;
+      const bookmarkIcon = document.getElementById('bookmark-icon');
+      const saveBg = document.getElementById('save-bg');
+
+      if (isSaved) {
+        bookmarkIcon.setAttribute('fill', '#f59e0b');
+        bookmarkIcon.setAttribute('stroke', '#f59e0b');
+        saveBg.classList.add('bg-amber-500/30', 'border-amber-500/50', 'text-amber-400');
+      } else {
+        bookmarkIcon.setAttribute('fill', 'none');
+        bookmarkIcon.setAttribute('stroke', 'currentColor');
+        saveBg.classList.remove('bg-amber-500/30', 'border-amber-500/50', 'text-amber-400');
+      }
+    }
+
     function showRandomCard() {
       if (!dataset || dataset.length === 0 || isAnimating) return;
       isAnimating = true;
@@ -127,24 +202,22 @@
       const sourceEl = document.getElementById('source-text');
       const bgEl = document.getElementById('bg-image');
 
-      // 1. Mevcut kartı yukarı kaydırarak silikleştir
       card.classList.add('slide-up-out');
 
       setTimeout(() => {
-        // Yeni veriyi yerleştir
+        resetActionButtons();
         const item = dataset[Math.floor(Math.random() * dataset.length)];
 
-        arabicEl.innerText = item['Arapça Yazi'] || item['Arapca Yazi'] || item['Arapça'] || '';
-        turkishEl.innerText = item['Türkçe Yazı'] || item['Türkçe Yazi'] || item['Turkce Yazi'] || item['Icerik'] || '';
+        arabicEl.innerText = item['Arapça Yazi'] || item['Arapca Yazi'] || item['Arapça'] || item['Arapca'] || '';
+        turkishEl.innerText = item['Türkçe Yazı'] || item['Türkçe Yazi'] || item['Turkce Yazi'] || item['Icerik'] || item['Meal'] || '';
         
         const sure = item['Sure İsmi'] || item['Sure Ismi'] || item['Sure'] || '';
-        const ayet = item['Ayet Numarası'] || item['Sure numarası'] || item['Ayet'] || '';
+        const ayet = item['Ayet Numarası'] || item['Sure numarası'] || item['Ayet No'] || item['Ayet'] || '';
         sourceEl.innerText = sure ? `${sure} Suresi ${ayet ? ', ' + ayet + '. Ayet' : ''}` : (item['Kaynak'] || 'Kur\'an-ı Kerim');
 
         const randomBg = BG_IMAGES[Math.floor(Math.random() * BG_IMAGES.length)];
         bgEl.style.backgroundImage = `url('${randomBg}')`;
 
-        // 2. Yeni kartı alttan yukarı yumuşakça kaydır
         card.classList.remove('slide-up-out');
         card.classList.add('slide-up-in');
 
@@ -157,14 +230,13 @@
       }, 350);
     }
 
-    // Yukarı Kaydırma (Swipe Up) Yakalama
+    // Yukarı Kaydırma Yakalama
     window.addEventListener('touchstart', e => { 
       startY = e.touches[0].clientY; 
     }, { passive: true });
 
     window.addEventListener('touchend', e => {
       const deltaY = startY - e.changedTouches[0].clientY;
-      // Parmağı yukarı kaydırma hareketi (min 40px)
       if (deltaY > 40) {
         showRandomCard();
       }
