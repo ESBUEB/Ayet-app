@@ -11,12 +11,21 @@
   <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet" />
   
   <style>
-    body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; touch-action: pan-y; }
+    html, body {
+      touch-action: none;
+      overscroll-behavior: none;
+      overflow: hidden;
+      height: 100%;
+      width: 100%;
+    }
+    body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
     .font-arabic { font-family: 'Amiri', serif; }
     .bg-overlay { background: linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0.85) 100%); }
     
     #card-content {
       will-change: transform, opacity;
+      transform-style: preserve-3d;
+      backface-visibility: hidden;
     }
 
     @keyframes heartPop {
@@ -48,7 +57,7 @@
   <!-- Sağ Yan Aksiyon Menüsü -->
   <div class="absolute right-4 bottom-28 z-30 flex flex-col items-center space-y-6">
     <button id="like-btn" onclick="toggleLike(event)" class="flex flex-col items-center space-y-1 group focus:outline-none">
-      <div id="like-bg" class="p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white group-active:scale-125 transition-all">
+      <div id="like-bg" class="p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white transition-all">
         <svg id="heart-icon" class="w-6 h-6 fill-none stroke-current stroke-2 transition-colors" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
         </svg>
@@ -57,7 +66,7 @@
     </button>
 
     <button id="save-btn" onclick="toggleSave(event)" class="flex flex-col items-center space-y-1 group focus:outline-none">
-      <div id="save-bg" class="p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white group-active:scale-125 transition-all">
+      <div id="save-bg" class="p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white transition-all">
         <svg id="bookmark-icon" class="w-6 h-6 fill-none stroke-current stroke-2 transition-colors" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
         </svg>
@@ -67,16 +76,16 @@
   </div>
 
   <!-- Ana Kart Konteyner -->
-  <div id="app" class="relative z-10 h-full w-full flex flex-col justify-between p-6 max-w-md mx-auto">
+  <div id="app" class="relative z-10 h-full w-full flex flex-col justify-between p-6 max-w-md mx-auto pointer-events-none">
     
-    <div class="text-center pt-8">
+    <div class="text-center pt-8 pointer-events-auto">
       <span class="bg-black/40 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-semibold tracking-widest uppercase border border-white/10 text-amber-300">
         Günün Hikmeti
       </span>
     </div>
 
-    <!-- Parmağı Takip Eden Kart -->
-    <div id="card-content" class="my-auto text-center space-y-6 px-2 pr-10">
+    <!-- Akıcı Kart -->
+    <div id="card-content" class="my-auto text-center space-y-6 px-2 pr-10 pointer-events-auto">
       <p id="arabic-text" class="font-arabic text-2xl md:text-3xl text-amber-200 leading-relaxed dir-rtl">
         Yükleniyor...
       </p>
@@ -86,7 +95,7 @@
       </p>
     </div>
 
-    <div class="pb-10 text-center space-y-3">
+    <div class="pb-10 text-center space-y-3 pointer-events-auto">
       <div id="source-text" class="text-sm font-semibold text-white/75 bg-black/30 backdrop-blur-sm py-1.5 px-4 rounded-lg inline-block border border-white/5">
         -
       </div>
@@ -114,6 +123,7 @@
     ];
 
     var dataset = [];
+    var deck = [];
     var isLiked = false;
     var isSaved = false;
     var lastBgIndex = -1;
@@ -129,7 +139,10 @@
           skipEmptyLines: true,
           complete: function(results) {
             dataset = results.data;
-            if (dataset.length > 0) renderContent();
+            if (dataset.length > 0) {
+              rebuildDeck();
+              renderContent();
+            }
           }
         });
       } catch (error) {
@@ -137,11 +150,29 @@
       }
     }
 
+    // TEKRAR ENGELLEME: Tüm ayetler bitene kadar karıştırılmış desteden çekim yapar
+    function rebuildDeck() {
+      deck = [];
+      for (var i = 0; i < dataset.length; i++) deck.push(i);
+      for (var j = deck.length - 1; j > 0; j--) {
+        var r = Math.floor(Math.random() * (j + 1));
+        var temp = deck[j];
+        deck[j] = deck[r];
+        deck[r] = temp;
+      }
+    }
+
+    function getNextItem() {
+      if (deck.length === 0) rebuildDeck();
+      var index = deck.pop();
+      return dataset[index];
+    }
+
     function renderContent() {
       if (!dataset || dataset.length === 0) return;
       resetActionButtons();
       
-      var item = dataset[Math.floor(Math.random() * dataset.length)];
+      var item = getNextItem();
 
       document.getElementById('arabic-text').innerText = item['Arapça Yazi'] || item['Arapca Yazi'] || item['Arapça'] || item['Arapca'] || '';
       document.getElementById('turkish-text').innerText = item['Türkçe Yazı'] || item['Türkçe Yazi'] || item['Turkce Yazi'] || item['Icerik'] || item['Meal'] || '';
@@ -205,11 +236,12 @@
       }
     }
 
-    // Dokunmatik Parmağı Takip Etme Fizikleri
+    // --- GELİŞMİŞ NATIVE KAYDIRMA FİZİĞİ ---
     var card = document.getElementById('card-content');
     var startY = 0;
     var currentY = 0;
     var isDragging = false;
+    var animFrame = null;
 
     window.addEventListener('touchstart', function(e) {
       startY = e.touches[0].clientY;
@@ -224,8 +256,13 @@
       var deltaY = currentY - startY;
 
       if (deltaY < 0) {
-        card.style.transform = 'translateY(' + deltaY + 'px)';
-        card.style.opacity = (1 - Math.abs(deltaY) / 250);
+        if (animFrame) cancelAnimationFrame(animFrame);
+        animFrame = requestAnimationFrame(function() {
+          var progress = Math.min(Math.abs(deltaY) / 300, 1);
+          var scale = 1 - (progress * 0.08); // Çekildikçe hafif küçülme
+          card.style.transform = 'translate3d(0, ' + deltaY + 'px, 0) scale(' + scale + ')';
+          card.style.opacity = (1 - progress * 0.8).toFixed(2);
+        });
       }
     }, { passive: true });
 
@@ -234,27 +271,29 @@
       isDragging = false;
       var deltaY = currentY - startY;
 
-      card.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease';
-
-      if (deltaY < -70) {
-        card.style.transform = 'translateY(-120px)';
+      if (deltaY < -60) {
+        // Yukarı Fırlatma Animasyonu (Akıcı Springs)
+        card.style.transition = 'transform 0.28s cubic-bezier(0.4, 0, 1, 1), opacity 0.25s ease-out';
+        card.style.transform = 'translate3d(0, -140px, 0) scale(0.9)';
         card.style.opacity = '0';
 
         setTimeout(function() {
           renderContent();
           card.style.transition = 'none';
-          card.style.transform = 'translateY(100px)';
+          card.style.transform = 'translate3d(0, 120px, 0) scale(0.92)';
           
           requestAnimationFrame(function() {
             requestAnimationFrame(function() {
-              card.style.transition = 'transform 0.35s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.35s ease';
-              card.style.transform = 'translateY(0)';
+              card.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.35s ease-in-out';
+              card.style.transform = 'translate3d(0, 0, 0) scale(1)';
               card.style.opacity = '1';
             });
           });
-        }, 250);
+        }, 220);
       } else {
-        card.style.transform = 'translateY(0)';
+        // İptal Olursa Yerine Geri Esneme
+        card.style.transition = 'transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease';
+        card.style.transform = 'translate3d(0, 0, 0) scale(1)';
         card.style.opacity = '1';
       }
     });
@@ -280,10 +319,4 @@
       el.style.top = y + 'px';
       el.innerText = 'بِسْمِ ٱللَّهِ';
       container.appendChild(el);
-      setTimeout(function() { el.remove(); }, 800);
-    }
-
-    loadData();
-  </script>
-</body>
-</html>
+      setTimeout(function() { el.remove(); }, 80
