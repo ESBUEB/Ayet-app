@@ -15,16 +15,8 @@
     .font-arabic { font-family: 'Amiri', serif; }
     .bg-overlay { background: linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0.85) 100%); }
     
-    .card-anim {
-      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
-    }
-    .slide-up-out {
-      transform: translateY(-80px);
-      opacity: 0;
-    }
-    .slide-up-in {
-      transform: translateY(80px);
-      opacity: 0;
+    #card-content {
+      will-change: transform, opacity;
     }
 
     @keyframes heartPop {
@@ -43,7 +35,7 @@
 <body class="bg-black text-white h-screen w-screen overflow-hidden select-none">
 
   <!-- Arka Plan Görseli -->
-  <div id="bg-image" class="absolute inset-0 bg-cover bg-center transition-all duration-1000 scale-105" 
+  <div id="bg-image" class="absolute inset-0 bg-cover bg-center transition-all duration-700 scale-105" 
        style="background-image: url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1000');">
   </div>
   
@@ -53,9 +45,8 @@
   <!-- Bismillah Animasyon Alanı -->
   <div id="anim-container" class="absolute inset-0 pointer-events-none z-50"></div>
 
-  <!-- Sağ Yan Aksiyon Menüsü (Beğen & Kaydet) -->
+  <!-- Sağ Yan Aksiyon Menüsü -->
   <div class="absolute right-4 bottom-28 z-30 flex flex-col items-center space-y-6">
-    <!-- Beğen Butonu -->
     <button id="like-btn" onclick="toggleLike(event)" class="flex flex-col items-center space-y-1 group focus:outline-none">
       <div id="like-bg" class="p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white group-active:scale-125 transition-all">
         <svg id="heart-icon" class="w-6 h-6 fill-none stroke-current stroke-2 transition-colors" viewBox="0 0 24 24">
@@ -65,7 +56,6 @@
       <span class="text-[10px] font-semibold text-white/80 drop-shadow">Beğen</span>
     </button>
 
-    <!-- Kaydet Butonu -->
     <button id="save-btn" onclick="toggleSave(event)" class="flex flex-col items-center space-y-1 group focus:outline-none">
       <div id="save-bg" class="p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white group-active:scale-125 transition-all">
         <svg id="bookmark-icon" class="w-6 h-6 fill-none stroke-current stroke-2 transition-colors" viewBox="0 0 24 24">
@@ -79,15 +69,14 @@
   <!-- Ana Kart Konteyner -->
   <div id="app" class="relative z-10 h-full w-full flex flex-col justify-between p-6 max-w-md mx-auto">
     
-    <!-- Üst Başlık -->
     <div class="text-center pt-8">
       <span class="bg-black/40 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-semibold tracking-widest uppercase border border-white/10 text-amber-300">
         Günün Hikmeti
       </span>
     </div>
 
-    <!-- Orta Alan (Animasyonlu Kart) -->
-    <div id="card-content" class="card-anim my-auto text-center space-y-6 px-2 pr-10">
+    <!-- Parmağı Takip Eden Kart -->
+    <div id="card-content" class="my-auto text-center space-y-6 px-2 pr-10">
       <p id="arabic-text" class="font-arabic text-2xl md:text-3xl text-amber-200 leading-relaxed dir-rtl">
         Yükleniyor...
       </p>
@@ -97,12 +86,11 @@
       </p>
     </div>
 
-    <!-- Alt Alan: Kaynak ve Bilgi -->
     <div class="pb-10 text-center space-y-3">
       <div id="source-text" class="text-sm font-semibold text-white/75 bg-black/30 backdrop-blur-sm py-1.5 px-4 rounded-lg inline-block border border-white/5">
         -
       </div>
-      <p class="text-[10px] text-white/40 tracking-wider">Sonraki için yukarı kaydırın • Çift tıkla</p>
+      <p class="text-[10px] text-white/40 tracking-wider">Yukarı kaydırın • Çift tıkla</p>
     </div>
 
   </div>
@@ -122,19 +110,10 @@
       "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=1000",
       "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?q=80&w=1000",
       "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?q=80&w=1000",
-      "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=1000",
-      "https://images.unsplash.com/photo-1505118380757-91f5f5632de0?q=80&w=1000",
-      "https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=1000",
-      "https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1000",
-      "https://images.unsplash.com/photo-1542810634-71277d95dcbb?q=80&w=1000",
-      "https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?q=80&w=1000",
-      "https://images.unsplash.com/photo-1473448912268-2022ce9509d8?q=80&w=1000",
-      "https://images.unsplash.com/photo-1473580044384-7ba9967e16a0?q=80&w=1000"
+      "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=1000"
     ];
 
     let dataset = [];
-    let startY = 0;
-    let isAnimating = false;
     let isLiked = false;
     let isSaved = false;
     let lastBgIndex = -1;
@@ -150,7 +129,7 @@
           skipEmptyLines: true,
           complete: function(results) {
             dataset = results.data;
-            if (dataset.length > 0) showRandomCard();
+            if (dataset.length > 0) renderContent();
           }
         });
       } catch (error) {
@@ -158,55 +137,20 @@
       }
     }
 
-    function resetActionButtons() {
-      isLiked = false;
-      isSaved = false;
+    function renderContent() {
+      if (!dataset || dataset.length === 0) return;
+      resetActionButtons();
+      
+      const item = dataset[Math.floor(Math.random() * dataset.length)];
 
-      const heartIcon = document.getElementById('heart-icon');
-      const likeBg = document.getElementById('like-bg');
-      heartIcon.setAttribute('fill', 'none');
-      heartIcon.setAttribute('stroke', 'currentColor');
-      likeBg.classList.remove('bg-red-500/30', 'border-red-500/50', 'text-red-400');
+      document.getElementById('arabic-text').innerText = item['Arapça Yazi'] || item['Arapca Yazi'] || item['Arapça'] || item['Arapca'] || '';
+      document.getElementById('turkish-text').innerText = item['Türkçe Yazı'] || item['Türkçe Yazi'] || item['Turkce Yazi'] || item['Icerik'] || item['Meal'] || '';
+      
+      const sure = item['Sure İsmi'] || item['Sure Ismi'] || item['Sure'] || '';
+      const ayet = item['Ayet Numarası'] || item['Sure numarası'] || item['Ayet No'] || item['Ayet'] || '';
+      document.getElementById('source-text').innerText = sure ? `${sure} Suresi ${ayet ? ', ' + ayet + '. Ayet' : ''}` : (item['Kaynak'] || 'Kur\'an-ı Kerim');
 
-      const bookmarkIcon = document.getElementById('bookmark-icon');
-      const saveBg = document.getElementById('save-bg');
-      bookmarkIcon.setAttribute('fill', 'none');
-      bookmarkIcon.setAttribute('stroke', 'currentColor');
-      saveBg.classList.remove('bg-amber-500/30', 'border-amber-500/50', 'text-amber-400');
-    }
-
-    function toggleLike(e) {
-      e.stopPropagation();
-      isLiked = !isLiked;
-      const heartIcon = document.getElementById('heart-icon');
-      const likeBg = document.getElementById('like-bg');
-
-      if (isLiked) {
-        heartIcon.setAttribute('fill', '#ef4444');
-        heartIcon.setAttribute('stroke', '#ef4444');
-        likeBg.classList.add('bg-red-500/30', 'border-red-500/50', 'text-red-400');
-      } else {
-        heartIcon.setAttribute('fill', 'none');
-        heartIcon.setAttribute('stroke', 'currentColor');
-        likeBg.classList.remove('bg-red-500/30', 'border-red-500/50', 'text-red-400');
-      }
-    }
-
-    function toggleSave(e) {
-      e.stopPropagation();
-      isSaved = !isSaved;
-      const bookmarkIcon = document.getElementById('bookmark-icon');
-      const saveBg = document.getElementById('save-bg');
-
-      if (isSaved) {
-        bookmarkIcon.setAttribute('fill', '#f59e0b');
-        bookmarkIcon.setAttribute('stroke', '#f59e0b');
-        saveBg.classList.add('bg-amber-500/30', 'border-amber-500/50', 'text-amber-400');
-      } else {
-        bookmarkIcon.setAttribute('fill', 'none');
-        bookmarkIcon.setAttribute('stroke', 'currentColor');
-        saveBg.classList.remove('bg-amber-500/30', 'border-amber-500/50', 'text-amber-400');
-      }
+      document.getElementById('bg-image').style.backgroundImage = `url('${getRandomBg()}')`;
     }
 
     function getRandomBg() {
@@ -218,54 +162,107 @@
       return BG_IMAGES[nextIndex];
     }
 
-    function showRandomCard() {
-      if (!dataset || dataset.length === 0 || isAnimating) return;
-      isAnimating = true;
+    function resetActionButtons() {
+      isLiked = false; isSaved = false;
+      const heartIcon = document.getElementById('heart-icon');
+      const likeBg = document.getElementById('like-bg');
+      heartIcon.setAttribute('fill', 'none');
+      heartIcon.setAttribute('stroke', 'currentColor');
+      likeBg.className = "p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white transition-all";
 
-      const card = document.getElementById('card-content');
-      const arabicEl = document.getElementById('arabic-text');
-      const turkishEl = document.getElementById('turkish-text');
-      const sourceEl = document.getElementById('source-text');
-      const bgEl = document.getElementById('bg-image');
-
-      card.classList.add('slide-up-out');
-
-      setTimeout(() => {
-        resetActionButtons();
-        const item = dataset[Math.floor(Math.random() * dataset.length)];
-
-        arabicEl.innerText = item['Arapça Yazi'] || item['Arapca Yazi'] || item['Arapça'] || item['Arapca'] || '';
-        turkishEl.innerText = item['Türkçe Yazı'] || item['Türkçe Yazi'] || item['Turkce Yazi'] || item['Icerik'] || item['Meal'] || '';
-        
-        const sure = item['Sure İsmi'] || item['Sure Ismi'] || item['Sure'] || '';
-        const ayet = item['Ayet Numarası'] || item['Sure numarası'] || item['Ayet No'] || item['Ayet'] || '';
-        sourceEl.innerText = sure ? `${sure} Suresi ${ayet ? ', ' + ayet + '. Ayet' : ''}` : (item['Kaynak'] || 'Kur\'an-ı Kerim');
-
-        bgEl.style.backgroundImage = `url('${getRandomBg()}')`;
-
-        card.classList.remove('slide-up-out');
-        card.classList.add('slide-up-in');
-
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            card.classList.remove('slide-up-in');
-            isAnimating = false;
-          });
-        });
-      }, 350);
+      const bookmarkIcon = document.getElementById('bookmark-icon');
+      const saveBg = document.getElementById('save-bg');
+      bookmarkIcon.setAttribute('fill', 'none');
+      bookmarkIcon.setAttribute('stroke', 'currentColor');
+      saveBg.className = "p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white transition-all";
     }
 
-    window.addEventListener('touchstart', e => { 
-      startY = e.touches[0].clientY; 
+    function toggleLike(e) {
+      e.stopPropagation();
+      isLiked = !isLiked;
+      const heartIcon = document.getElementById('heart-icon');
+      const likeBg = document.getElementById('like-bg');
+      if (isLiked) {
+        heartIcon.setAttribute('fill', '#ef4444'); heartIcon.setAttribute('stroke', '#ef4444');
+        likeBg.className = "p-3 bg-red-500/30 backdrop-blur-md rounded-full border border-red-500/50 text-red-400 transition-all";
+      } else {
+        heartIcon.setAttribute('fill', 'none'); heartIcon.setAttribute('stroke', 'currentColor');
+        likeBg.className = "p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white transition-all";
+      }
+    }
+
+    function toggleSave(e) {
+      e.stopPropagation();
+      isSaved = !isSaved;
+      const bookmarkIcon = document.getElementById('bookmark-icon');
+      const saveBg = document.getElementById('save-bg');
+      if (isSaved) {
+        bookmarkIcon.setAttribute('fill', '#f59e0b'); bookmarkIcon.setAttribute('stroke', '#f59e0b');
+        saveBg.className = "p-3 bg-amber-500/30 backdrop-blur-md rounded-full border border-amber-500/50 text-amber-400 transition-all";
+      } else {
+        bookmarkIcon.setAttribute('fill', 'none'); bookmarkIcon.setAttribute('stroke', 'currentColor');
+        saveBg.className = "p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white transition-all";
+      }
+    }
+
+    // --- GERÇEK ZAMANLI PARMAK TAKİP FİZİĞİ ---
+    const card = document.getElementById('card-content');
+    let startY = 0;
+    let currentY = 0;
+    let isDragging = false;
+
+    window.addEventListener('touchstart', e => {
+      startY = e.touches[0].clientY;
+      currentY = startY;
+      isDragging = true;
+      card.style.transition = 'none'; // Parmağı anlık takip etsin
     }, { passive: true });
 
-    window.addEventListener('touchend', e => {
-      const deltaY = startY - e.changedTouches[0].clientY;
-      if (deltaY > 40) {
-        showRandomCard();
+    window.addEventListener('touchmove', e => {
+      if (!isDragging) return;
+      currentY = e.touches[0].clientY;
+      const deltaY = currentY - startY;
+
+      // Sadece yukarı kaydırmalara izin ver
+      if (deltaY < 0) {
+        card.style.transform = `translateY(${deltaY}px)`;
+        card.style.opacity = `${1 - Math.abs(deltaY) / 250}`;
       }
     }, { passive: true });
 
+    window.addEventListener('touchend', () => {
+      if (!isDragging) return;
+      isDragging = false;
+      const deltaY = currentY - startY;
+
+      card.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease';
+
+      // 70 pikselden fazla yukarı çekildiyse uçur ve yenisini getir
+      if (deltaY < -70) {
+        card.style.transform = 'translateY(-120px)';
+        card.style.opacity = '0';
+
+        setTimeout(() => {
+          renderContent();
+          card.style.transition = 'none';
+          card.style.transform = 'translateY(100px)';
+          
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              card.style.transition = 'transform 0.35s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.35s ease';
+              card.style.transform = 'translateY(0)';
+              card.style.opacity = '1';
+            });
+          });
+        }, 250);
+      } else {
+        // Yeterince çekilmediyse yerine geri esnesin
+        card.style.transform = 'translateY(0)';
+        card.style.opacity = '1';
+      }
+    });
+
+    // Çift Tıklama Bismillah Animasyonu
     let lastTap = 0;
     window.addEventListener('touchend', e => {
       const currentTime = new Date().getTime();
@@ -280,8 +277,7 @@
       const container = document.getElementById('anim-container');
       const el = document.createElement('div');
       el.className = 'heart-animation text-amber-300 font-bold text-3xl font-arabic drop-shadow-lg';
-      el.style.left = `${x}px`;
-      el.style.top = `${y}px`;
+      el.style.left = `${x}px`; el.style.top = `${y}px`;
       el.innerText = 'بِسْمِ ٱللَّهِ';
       container.appendChild(el);
       setTimeout(() => el.remove(), 800);
