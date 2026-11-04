@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Ayet & Hadis</title>
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#000000" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -106,21 +108,186 @@
   </div>
 
   <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
+
     const CSV_URL = "./veri.csv"; 
 
-    // Canlı, Farklı Renk Tonlarında 15 Yüksek Çözünürlüklü Arka Plan
     const BG_IMAGES = [
-      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1000", // Turkuaz Okyanus
-      "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=1000", // Pembe/Turuncu Dağ Gün Batımı
-      "https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1000", // Gece Mor/Mavi Yıldızlar
-      "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=1000", // Derin Sisli Orman
-      "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=1000", // Altın Güneşli Ağaçlar
-      "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?q=80&w=1000", // Canlı Yeşil Kuzey Işıkları (Aurora)
-      "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?q=80&w=1000", // Sıcak Çöl Kumu & Kızıl Gökyüzü
-      "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=1000", // Derin Uzay & Nebula Moru
-      "https://images.unsplash.com/photo-1505118380757-91f5f5632de0?q=80&w=1000", // Altın Dalgalar Gün Batımı
-      "https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=1000", // Görkemli Kanyon & Göl
-      "https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1000", // Renkli Bulutlar Akşam Üstü
-      "https://images.unsplash.com/photo-1542810634-71277d95dcbb?q=80&w=1000", // İslam Mimarisi Kubbe Gece
-      "https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?q=80&w=1000", // Canlı Turuncu/Kırmızı Ufuk
-      "
+      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1000",
+      "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=1000",
+      "https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1000",
+      "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=1000",
+      "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=1000",
+      "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?q=80&w=1000",
+      "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?q=80&w=1000",
+      "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=1000",
+      "https://images.unsplash.com/photo-1505118380757-91f5f5632de0?q=80&w=1000",
+      "https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=1000",
+      "https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1000",
+      "https://images.unsplash.com/photo-1542810634-71277d95dcbb?q=80&w=1000",
+      "https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?q=80&w=1000",
+      "https://images.unsplash.com/photo-1473448912268-2022ce9509d8?q=80&w=1000",
+      "https://images.unsplash.com/photo-1473580044384-7ba9967e16a0?q=80&w=1000"
+    ];
+
+    let dataset = [];
+    let startY = 0;
+    let isAnimating = false;
+    let isLiked = false;
+    let isSaved = false;
+    let lastBgIndex = -1;
+
+    async function loadData() {
+      try {
+        const response = await fetch(CSV_URL);
+        if (!response.ok) throw new Error("veri.csv bulunamadı!");
+        const csvText = await response.text();
+        
+        Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+          complete: function(results) {
+            dataset = results.data;
+            if (dataset.length > 0) showRandomCard();
+          }
+        });
+      } catch (error) {
+        document.getElementById('turkish-text').innerText = error.message;
+      }
+    }
+
+    function resetActionButtons() {
+      isLiked = false;
+      isSaved = false;
+
+      const heartIcon = document.getElementById('heart-icon');
+      const likeBg = document.getElementById('like-bg');
+      heartIcon.setAttribute('fill', 'none');
+      heartIcon.setAttribute('stroke', 'currentColor');
+      likeBg.classList.remove('bg-red-500/30', 'border-red-500/50', 'text-red-400');
+
+      const bookmarkIcon = document.getElementById('bookmark-icon');
+      const saveBg = document.getElementById('save-bg');
+      bookmarkIcon.setAttribute('fill', 'none');
+      bookmarkIcon.setAttribute('stroke', 'currentColor');
+      saveBg.classList.remove('bg-amber-500/30', 'border-amber-500/50', 'text-amber-400');
+    }
+
+    function toggleLike(e) {
+      e.stopPropagation();
+      isLiked = !isLiked;
+      const heartIcon = document.getElementById('heart-icon');
+      const likeBg = document.getElementById('like-bg');
+
+      if (isLiked) {
+        heartIcon.setAttribute('fill', '#ef4444');
+        heartIcon.setAttribute('stroke', '#ef4444');
+        likeBg.classList.add('bg-red-500/30', 'border-red-500/50', 'text-red-400');
+      } else {
+        heartIcon.setAttribute('fill', 'none');
+        heartIcon.setAttribute('stroke', 'currentColor');
+        likeBg.classList.remove('bg-red-500/30', 'border-red-500/50', 'text-red-400');
+      }
+    }
+
+    function toggleSave(e) {
+      e.stopPropagation();
+      isSaved = !isSaved;
+      const bookmarkIcon = document.getElementById('bookmark-icon');
+      const saveBg = document.getElementById('save-bg');
+
+      if (isSaved) {
+        bookmarkIcon.setAttribute('fill', '#f59e0b');
+        bookmarkIcon.setAttribute('stroke', '#f59e0b');
+        saveBg.classList.add('bg-amber-500/30', 'border-amber-500/50', 'text-amber-400');
+      } else {
+        bookmarkIcon.setAttribute('fill', 'none');
+        bookmarkIcon.setAttribute('stroke', 'currentColor');
+        saveBg.classList.remove('bg-amber-500/30', 'border-amber-500/50', 'text-amber-400');
+      }
+    }
+
+    function getRandomBg() {
+      let nextIndex;
+      do {
+        nextIndex = Math.floor(Math.random() * BG_IMAGES.length);
+      } while (nextIndex === lastBgIndex && BG_IMAGES.length > 1);
+      lastBgIndex = nextIndex;
+      return BG_IMAGES[nextIndex];
+    }
+
+    function showRandomCard() {
+      if (!dataset || dataset.length === 0 || isAnimating) return;
+      isAnimating = true;
+
+      const card = document.getElementById('card-content');
+      const arabicEl = document.getElementById('arabic-text');
+      const turkishEl = document.getElementById('turkish-text');
+      const sourceEl = document.getElementById('source-text');
+      const bgEl = document.getElementById('bg-image');
+
+      card.classList.add('slide-up-out');
+
+      setTimeout(() => {
+        resetActionButtons();
+        const item = dataset[Math.floor(Math.random() * dataset.length)];
+
+        arabicEl.innerText = item['Arapça Yazi'] || item['Arapca Yazi'] || item['Arapça'] || item['Arapca'] || '';
+        turkishEl.innerText = item['Türkçe Yazı'] || item['Türkçe Yazi'] || item['Turkce Yazi'] || item['Icerik'] || item['Meal'] || '';
+        
+        const sure = item['Sure İsmi'] || item['Sure Ismi'] || item['Sure'] || '';
+        const ayet = item['Ayet Numarası'] || item['Sure numarası'] || item['Ayet No'] || item['Ayet'] || '';
+        sourceEl.innerText = sure ? `${sure} Suresi ${ayet ? ', ' + ayet + '. Ayet' : ''}` : (item['Kaynak'] || 'Kur\'an-ı Kerim');
+
+        bgEl.style.backgroundImage = `url('${getRandomBg()}')`;
+
+        card.classList.remove('slide-up-out');
+        card.classList.add('slide-up-in');
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            card.classList.remove('slide-up-in');
+            isAnimating = false;
+          });
+        });
+      }, 350);
+    }
+
+    window.addEventListener('touchstart', e => { 
+      startY = e.touches[0].clientY; 
+    }, { passive: true });
+
+    window.addEventListener('touchend', e => {
+      const deltaY = startY - e.changedTouches[0].clientY;
+      if (deltaY > 40) {
+        showRandomCard();
+      }
+    }, { passive: true });
+
+    let lastTap = 0;
+    window.addEventListener('touchend', e => {
+      const currentTime = new Date().getTime();
+      const tapLength = currentTime - lastTap;
+      if (tapLength < 300 && tapLength > 0) {
+        showLikeAnimation(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+      }
+      lastTap = currentTime;
+    });
+
+    function showLikeAnimation(x, y) {
+      const container = document.getElementById('anim-container');
+      const el = document.createElement('div');
+      el.className = 'heart-animation text-amber-300 font-bold text-3xl font-arabic drop-shadow-lg';
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
+      el.innerText = 'بِسْمِ ٱللَّهِ';
+      container.appendChild(el);
+      setTimeout(() => el.remove(), 800);
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
