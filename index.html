@@ -110,13 +110,11 @@
   </div>
 
   <script>
-    // Eski Service Worker kilitlerini otomatik temizle
+    // 1. Service Worker önbellek kilitlenmesini anında temizle
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for (var registration of registrations) {
-          registration.unregister();
-        }
-      });
+        for (var reg of registrations) { reg.unregister(); }
+      }).catch(function() {});
     }
 
     var CSV_URL = "./veri.csv?t=" + new Date().getTime(); 
@@ -132,7 +130,6 @@
       "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=1000"
     ];
 
-    // CSV Yüklenemezse Çökmeyi Engelleyen Dahili Yedek Veri Seti
     var FALLBACK_DATA = [
       { arabic_text: "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ", translation_text: "Rahmân ve Rahîm olan Allah'ın adıyla.", surah_name_tr: "Fâtiha", verse_id: "1", translation_author: "Diyanet İşleri" },
       { arabic_text: "ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَٰلَمِينَ", translation_text: "Övgü, âlemlerin Rabbi Allah'adır.", surah_name_tr: "Fâtiha", verse_id: "2", translation_author: "Diyanet İşleri" },
@@ -152,6 +149,14 @@
     document.getElementById('read-counter').innerText = readCount;
     updateSavedBadge();
 
+    // 2. TIMEOUT SAFETY NET: Ne olursa olsun 1.5 saniye içinde ekranı zorla aç
+    var safetyTimer = setTimeout(function() {
+      if (!isInitialLoaded) {
+        dataset = FALLBACK_DATA;
+        startApp();
+      }
+    }, 1500);
+
     function escapeHTML(str) {
       if (!str) return '';
       return String(str)
@@ -165,29 +170,29 @@
     async function loadData() {
       try {
         var response = await fetch(CSV_URL);
-        if (!response.ok) throw new Error("veri.csv dosyasına ulaşılamadı.");
+        if (!response.ok) throw new Error("veri.csv bulunamadı");
         var csvText = await response.text();
 
-        Papa.parse(csvText, {
-          header: true,
-          skipEmptyLines: 'greedy',
-          complete: function(results) {
-            var rows = (results.data || []).filter(function(row) {
-              return row && Object.values(row).some(function(v) { return v && String(v).trim() !== ''; });
-            });
-
-            if (rows && rows.length > 0) {
-              dataset = rows;
-            } else {
+        if (window.Papa) {
+          Papa.parse(csvText, {
+            header: true,
+            skipEmptyLines: 'greedy',
+            complete: function(results) {
+              var rows = (results.data || []).filter(function(row) {
+                return row && Object.values(row).some(function(v) { return v && String(v).trim() !== ''; });
+              });
+              dataset = (rows && rows.length > 0) ? rows : FALLBACK_DATA;
+              startApp();
+            },
+            error: function() {
               dataset = FALLBACK_DATA;
+              startApp();
             }
-            startApp();
-          },
-          error: function() {
-            dataset = FALLBACK_DATA;
-            startApp();
-          }
-        });
+          });
+        } else {
+          dataset = FALLBACK_DATA;
+          startApp();
+        }
       } catch (error) {
         dataset = FALLBACK_DATA;
         startApp();
@@ -195,6 +200,9 @@
     }
 
     function startApp() {
+      if (isInitialLoaded) return;
+      clearTimeout(safetyTimer);
+      
       rebuildDeck();
       var loader = document.getElementById('loading-screen');
       if (loader) loader.remove();
@@ -272,4 +280,184 @@
             '<span class="text-[10px] font-semibold text-white/80 drop-shadow">Beğen</span>' +
           '</button>' +
           '<button onclick="toggleSave(this, event)" class="flex flex-col items-center space-y-1 group focus:outline-none">' +
-            '<div class="save-bg p-3 ' + (isSaved ? 'bg-amber-500/30 border-amber-500/
+            '<div class="save-bg p-3 ' + (isSaved ? 'bg-amber-500/30 border-amber-500/50 text-amber-400' : 'bg-black/40 border-white/10 text-white') + ' backdrop-blur-md rounded-full border transition-all">' +
+              '<svg class="bookmark-icon w-6 h-6 ' + (isSaved ? 'fill-amber-400 stroke-amber-400' : 'fill-none stroke-current') + ' stroke-2 transition-colors" viewBox="0 0 24 24">' +
+                '<path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />' +
+              '</svg>' +
+            '</div>' +
+            '<span class="text-[10px] font-semibold text-white/80 drop-shadow">Kaydet</span>' +
+          '</button>' +
+        '</div>' +
+        '<div class="relative z-10 h-full w-full flex flex-col justify-between max-w-md mx-auto pointer-events-none">' +
+          '<div class="text-center pt-16 pointer-events-auto">' +
+            '<span class="bg-black/40 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-semibold tracking-widest uppercase border border-white/10 text-amber-300">' +
+              'Günün Hikmeti' +
+            '</span>' +
+          '</div>' +
+          '<div class="my-auto text-center space-y-6 px-4 pointer-events-auto">' +
+            '<p dir="rtl" class="font-arabic text-2xl md:text-3xl text-amber-200 leading-relaxed text-center">' +
+              escapeHTML(parsed.arabic) +
+            '</p>' +
+            '<p class="text-lg md:text-xl font-medium text-white/95 leading-snug text-center">' +
+              escapeHTML(parsed.turkish) +
+            '</p>' +
+          '</div>' +
+          '<div class="pb-10 text-center space-y-3 pointer-events-auto">' +
+            '<div class="text-sm font-semibold text-white/75 bg-black/30 backdrop-blur-sm py-1.5 px-4 rounded-lg inline-block border border-white/5">' +
+              escapeHTML(sureInfo) +
+            '</div>' +
+            '<p class="text-[10px] text-white/40 tracking-wider">Aşağı kaydırın • Çift tıkla</p>' +
+          '</div>' +
+        '</div>';
+
+      cardDiv.innerHTML = htmlContent;
+      feedEl.appendChild(cardDiv);
+    }
+
+    var lastScrollIndex = 0;
+    feedEl.addEventListener('scroll', function() {
+      if (!isInitialLoaded) return;
+      
+      var currentIndex = Math.round(feedEl.scrollTop / feedEl.clientHeight);
+      if (currentIndex > lastScrollIndex) {
+        readCount += (currentIndex - lastScrollIndex);
+        lastScrollIndex = currentIndex;
+        document.getElementById('read-counter').innerText = readCount;
+        localStorage.setItem('ayet_read_count', readCount);
+      }
+
+      if (feedEl.scrollTop + feedEl.clientHeight >= feedEl.scrollHeight - (feedEl.clientHeight * 2)) {
+        appendCard();
+      }
+    });
+
+    function toggleLike(btn, e) {
+      e.stopPropagation();
+      var icon = btn.querySelector('.heart-icon');
+      var bg = btn.querySelector('.like-bg');
+      var isLiked = icon.getAttribute('fill') === '#ef4444';
+
+      if (!isLiked) {
+        icon.setAttribute('fill', '#ef4444');
+        icon.setAttribute('stroke', '#ef4444');
+        bg.className = "like-bg p-3 bg-red-500/30 backdrop-blur-md rounded-full border border-red-500/50 text-red-400 transition-all";
+      } else {
+        icon.setAttribute('fill', 'none');
+        icon.setAttribute('stroke', 'currentColor');
+        bg.className = "like-bg p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white transition-all";
+      }
+    }
+
+    function toggleSave(btn, e) {
+      e.stopPropagation();
+      var card = btn.closest('.snap-card');
+      var arabic = card.dataset.arabic;
+      var turkish = card.dataset.turkish;
+      var sureInfo = card.dataset.sureInfo;
+
+      var icon = btn.querySelector('.bookmark-icon');
+      var bg = btn.querySelector('.save-bg');
+      var index = savedVerses.findIndex(function(v) { return v.turkish === turkish && v.arabic === arabic; });
+
+      if (index === -1) {
+        savedVerses.push({ arabic: arabic, turkish: turkish, sureInfo: sureInfo });
+        icon.setAttribute('fill', '#f59e0b');
+        icon.setAttribute('stroke', '#f59e0b');
+        bg.className = "save-bg p-3 bg-amber-500/30 backdrop-blur-md rounded-full border border-amber-500/50 text-amber-400 transition-all";
+      } else {
+        savedVerses.splice(index, 1);
+        icon.setAttribute('fill', 'none');
+        icon.setAttribute('stroke', 'currentColor');
+        bg.className = "save-bg p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white transition-all";
+      }
+
+      localStorage.setItem('ayet_saved_list', JSON.stringify(savedVerses));
+      updateSavedBadge();
+    }
+
+    function updateSavedBadge() {
+      document.getElementById('saved-count-badge').innerText = savedVerses.length;
+    }
+
+    function openSavedModal() {
+      renderSavedList();
+      var modal = document.getElementById('saved-modal');
+      modal.classList.remove('hidden');
+      setTimeout(function() {
+        modal.classList.remove('opacity-0');
+      }, 10);
+    }
+
+    function closeSavedModal() {
+      var modal = document.getElementById('saved-modal');
+      modal.classList.add('opacity-0');
+      setTimeout(function() {
+        modal.classList.add('hidden');
+      }, 300);
+    }
+
+    function renderSavedList() {
+      var container = document.getElementById('saved-list');
+      if (!savedVerses || savedVerses.length === 0) {
+        container.innerHTML = '' +
+          '<div class="h-64 flex flex-col items-center justify-center text-center text-white/40 space-y-3">' +
+            '<svg class="w-12 h-12 stroke-current fill-none stroke-1" viewBox="0 0 24 24">' +
+              '<path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />' +
+            '</svg>' +
+            '<p class="text-sm">Henüz kaydedilmiş bir ayet bulunmuyor.</p>' +
+          '</div>';
+        return;
+      }
+
+      var html = '';
+      savedVerses.forEach(function(item, idx) {
+        html += '' +
+          '<div class="p-4 bg-white/5 border border-white/10 rounded-2xl relative space-y-3 text-left">' +
+            '<button onclick="removeSavedItem(' + idx + ')" class="absolute top-3 right-3 text-red-400/70 hover:text-red-400 p-1 active:scale-95 transition-all">' +
+              '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />' +
+              '</svg>' +
+            '</button>' +
+            (item.arabic ? '<p dir="rtl" class="font-arabic text-xl text-amber-200 leading-relaxed pr-6 text-center">' + escapeHTML(item.arabic) + '</p>' : '') +
+            '<p class="text-sm font-medium text-white/90 leading-snug text-left">' + escapeHTML(item.turkish) + '</p>' +
+            '<div class="text-[11px] font-semibold text-amber-300/80 bg-amber-400/10 px-2.5 py-1 rounded-md inline-block border border-amber-400/20">' +
+              escapeHTML(item.sureInfo) +
+            '</div>' +
+          '</div>';
+      });
+      container.innerHTML = html;
+    }
+
+    function removeSavedItem(index) {
+      savedVerses.splice(index, 1);
+      localStorage.setItem('ayet_saved_list', JSON.stringify(savedVerses));
+      updateSavedBadge();
+      renderSavedList();
+    }
+
+    var lastTap = 0;
+    window.addEventListener('click', function(e) {
+      if (e.target.closest('button') || e.target.closest('#saved-modal')) return;
+      var currentTime = new Date().getTime();
+      var tapLength = currentTime - lastTap;
+      if (tapLength < 300 && tapLength > 0) {
+        showLikeAnimation(e.clientX, e.clientY);
+      }
+      lastTap = currentTime;
+    });
+
+    function showLikeAnimation(x, y) {
+      var container = document.getElementById('anim-container');
+      var el = document.createElement('div');
+      el.className = 'heart-animation text-amber-300 font-bold text-3xl font-arabic drop-shadow-lg';
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      el.innerText = 'بِسْمِ ٱللَّهِ';
+      container.appendChild(el);
+      setTimeout(function() { el.remove(); }, 800);
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
