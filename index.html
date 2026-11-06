@@ -23,8 +23,8 @@
     }
     .font-arabic { font-family: 'Amiri', serif; }
     
-    /* Thunkable PageViewer & Scroll Snap Motoru */
-    .thunkable-container {
+    /* Thunkable Native Scroll Snap Motoru */
+    .snap-container {
       scroll-snap-type: y mandatory;
       overflow-y: scroll;
       height: 100vh;
@@ -32,9 +32,9 @@
       -webkit-overflow-scrolling: touch;
       scrollbar-width: none;
     }
-    .thunkable-container::-webkit-scrollbar { display: none; }
+    .snap-container::-webkit-scrollbar { display: none; }
 
-    .thunkable-card {
+    .snap-card {
       scroll-snap-align: start;
       scroll-snap-stop: always;
       height: 100vh;
@@ -59,8 +59,8 @@
 </head>
 <body class="bg-black text-white select-none">
 
-  <!-- Thunkable Ana Ekran Konteyneri -->
-  <div id="feed" class="thunkable-container">
+  <!-- Scroll Snap Konteyneri -->
+  <div id="feed" class="snap-container">
     <div id="loading-screen" class="h-screen w-screen flex flex-col items-center justify-center text-center p-6 text-amber-200">
       <div class="w-10 h-10 border-4 border-amber-300 border-t-transparent rounded-full animate-spin mb-4"></div>
       <p class="text-sm font-medium tracking-wide">Ayet havuzu yükleniyor...</p>
@@ -74,7 +74,7 @@
       navigator.serviceWorker.register('./sw.js').catch(function() {});
     }
 
-    var CSV_URL = "./veri.csv?cachebust=" + new Date().getTime(); 
+    var CSV_URL = "./veri.csv?v=" + new Date().getTime(); 
 
     var BG_IMAGES = [
       "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1000",
@@ -94,16 +94,22 @@
     var feedEl = document.getElementById('feed');
     var isInitialLoaded = false;
 
+    function escapeHTML(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
     async function loadData() {
       try {
         var response = await fetch(CSV_URL);
-        if (!response.ok) {
-          throw new Error("veri.csv bulunamadı. GitHub deponuzda 'veri.csv' adında dosya olduğundan emin olun.");
-        }
-        
+        if (!response.ok) throw new Error("veri.csv bulunamadı!");
         var csvText = await response.text();
         
-        // CSV ayrıştırma
         Papa.parse(csvText, {
           header: true,
           skipEmptyLines: 'greedy',
@@ -122,66 +128,24 @@
                 appendCard();
               }
               isInitialLoaded = true;
-            } else {
-              showError("veri.csv yüklendi ancak içerisinde okunabilir satır bulunamadı.");
             }
           }
         });
       } catch (error) {
-        showError(error.message);
+        console.error(error);
       }
     }
 
-    function showError(msg) {
-      var loader = document.getElementById('loading-screen');
-      if (loader) {
-        loader.innerHTML = 
-          "<div class='p-5 bg-red-950/90 rounded-2xl border border-red-500/40 max-w-xs text-center'>" +
-          "<p class='text-red-400 font-bold text-sm mb-2'>Veri Yükleme Hatası</p>" +
-          "<p class='text-xs text-white/80 leading-relaxed font-mono mb-3'>" + msg + "</p>" +
-          "<p class='text-[10px] text-amber-300/80'>Deponuzdaki dosya adının 'veri.csv' olduğundan emin olun.</p>" +
-          "</div>";
-      }
-    }
-
-    // Esnek Sütun Ayrıştırıcı (Thunkable Data Source Mantığı)
+    // GÖRSELDEKİ TAM SÜTUN BAŞLIKLARINI HARİTALAMA (arabic_text, translation_text, surah_name_tr...)
     function extractRowData(item) {
       if (!item) return { arabic: '', turkish: '', sure: '', ayet: '', kaynak: '' };
 
-      var keys = Object.keys(item);
-      
-      // Noktalı virgül (;) koruması
-      if (keys.length === 1 && keys[0].indexOf(';') !== -1) {
-        var headers = keys[0].split(';');
-        var values = (item[keys[0]] || '').toString().split(';');
-        item = {};
-        for (var h = 0; h < headers.length; h++) {
-          item[headers[h].trim()] = values[h] ? values[h].trim() : '';
-        }
-        keys = Object.keys(item);
-      }
+      var arabic = item['arabic_text'] || item['Arapça Yazi'] || item['Arapca'] || '';
+      var turkish = item['translation_text'] || item['Türkçe Yazı'] || item['Meal'] || '';
+      var sure = item['surah_name_tr'] || item['Sure İsmi'] || item['Sure'] || '';
+      var ayet = item['verse_id'] || item['Ayet Numarası'] || item['Ayet'] || '';
+      var kaynak = item['translation_author'] || item['Kaynak'] || 'Kur\'an-ı Kerim';
 
-      var arabic = '', turkish = '', sure = '', ayet = '', kaynak = '';
-
-      // Bilinen sütun isimleri
-      arabic = item['Arapça Yazi'] || item['Arapca Yazi'] || item['Arapça'] || item['Arapca'] || item['Arabic'] || '';
-      turkish = item['Türkçe Yazı'] || item['Türkçe Yazi'] || item['Turkce Yazi'] || item['Icerik'] || item['Meal'] || item['Turkish'] || item['Metin'] || '';
-      sure = item['Sure İsmi'] || item['Sure Ismi'] || item['Sure'] || item['Surah'] || '';
-      ayet = item['Ayet Numarası'] || item['Sure numarası'] || item['Ayet No'] || item['Ayet'] || item['Verse'] || '';
-      kaynak = item['Kaynak'] || item['Source'] || '';
-
-      // Eğer eşleşmediyse içeriğe göre tespit et
-      if (!arabic || !turkish) {
-        for (var i = 0; i < keys.length; i++) {
-          var val = (item[keys[i]] || '').toString().trim();
-          if (!val) continue;
-          if (!arabic && /[\u0600-\u06FF]/.test(val)) {
-            arabic = val;
-          } else if (!turkish && val.length > 3 && val !== arabic) {
-            turkish = val;
-          }
-        }
-      }
       return { arabic: arabic, turkish: turkish, sure: sure, ayet: ayet, kaynak: kaynak };
     }
 
@@ -205,4 +169,132 @@
     function getRandomBg() {
       var nextIndex;
       do {
-        nextIndex =
+        nextIndex = Math.floor(Math.random() * BG_IMAGES.length);
+      } while (nextIndex === lastBgIndex && BG_IMAGES.length > 1);
+      lastBgIndex = nextIndex;
+      return BG_IMAGES[nextIndex];
+    }
+
+    function appendCard() {
+      var rawItem = getNextItem();
+      var parsed = extractRowData(rawItem);
+      var bgUrl = getRandomBg();
+      var sureInfo = parsed.sure ? parsed.sure + ' Suresi' + (parsed.ayet ? ', ' + parsed.ayet + '. Ayet' : '') : parsed.kaynak;
+
+      var cardDiv = document.createElement('div');
+      cardDiv.className = 'snap-card flex flex-col justify-between p-6 overflow-hidden bg-cover bg-center';
+      cardDiv.style.backgroundImage = 'url("' + bgUrl + '")';
+
+      var htmlContent = '' +
+        '<div class="absolute inset-0 bg-overlay"></div>' +
+        '<div class="absolute right-4 bottom-28 z-30 flex flex-col items-center space-y-6">' +
+          '<button onclick="toggleLike(this, event)" class="flex flex-col items-center space-y-1 group focus:outline-none">' +
+            '<div class="like-bg p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white transition-all">' +
+              '<svg class="heart-icon w-6 h-6 fill-none stroke-current stroke-2 transition-colors" viewBox="0 0 24 24">' +
+                '<path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />' +
+              '</svg>' +
+            '</div>' +
+            '<span class="text-[10px] font-semibold text-white/80 drop-shadow">Beğen</span>' +
+          '</button>' +
+          '<button onclick="toggleSave(this, event)" class="flex flex-col items-center space-y-1 group focus:outline-none">' +
+            '<div class="save-bg p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white transition-all">' +
+              '<svg class="bookmark-icon w-6 h-6 fill-none stroke-current stroke-2 transition-colors" viewBox="0 0 24 24">' +
+                '<path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />' +
+              '</svg>' +
+            '</div>' +
+            '<span class="text-[10px] font-semibold text-white/80 drop-shadow">Kaydet</span>' +
+          '</button>' +
+        '</div>' +
+        '<div class="relative z-10 h-full w-full flex flex-col justify-between max-w-md mx-auto">' +
+          '<div class="text-center pt-8">' +
+            '<span class="bg-black/40 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-semibold tracking-widest uppercase border border-white/10 text-amber-300">' +
+              'Günün Hikmeti' +
+            '</span>' +
+          '</div>' +
+          '<div class="my-auto text-center space-y-6 px-2 pr-10">' +
+            '<p class="font-arabic text-2xl md:text-3xl text-amber-200 leading-relaxed dir-rtl">' +
+              escapeHTML(parsed.arabic) +
+            '</p>' +
+            '<p class="text-lg md:text-xl font-medium text-white/95 leading-snug">' +
+              escapeHTML(parsed.turkish) +
+            '</p>' +
+          '</div>' +
+          '<div class="pb-10 text-center space-y-3">' +
+            '<div class="text-sm font-semibold text-white/75 bg-black/30 backdrop-blur-sm py-1.5 px-4 rounded-lg inline-block border border-white/5">' +
+              escapeHTML(sureInfo) +
+            '</div>' +
+            '<p class="text-[10px] text-white/40 tracking-wider">Aşağı kaydırın • Çift tıkla</p>' +
+          '</div>' +
+        '</div>';
+
+      cardDiv.innerHTML = htmlContent;
+      feedEl.appendChild(cardDiv);
+    }
+
+    feedEl.addEventListener('scroll', function() {
+      if (!isInitialLoaded) return;
+      if (feedEl.scrollTop + feedEl.clientHeight >= feedEl.scrollHeight - (feedEl.clientHeight * 2)) {
+        appendCard();
+      }
+    });
+
+    function toggleLike(btn, e) {
+      e.stopPropagation();
+      var icon = btn.querySelector('.heart-icon');
+      var bg = btn.querySelector('.like-bg');
+      var isLiked = icon.getAttribute('fill') === '#ef4444';
+
+      if (!isLiked) {
+        icon.setAttribute('fill', '#ef4444');
+        icon.setAttribute('stroke', '#ef4444');
+        bg.className = "like-bg p-3 bg-red-500/30 backdrop-blur-md rounded-full border border-red-500/50 text-red-400 transition-all";
+      } else {
+        icon.setAttribute('fill', 'none');
+        icon.setAttribute('stroke', 'currentColor');
+        bg.className = "like-bg p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white transition-all";
+      }
+    }
+
+    function toggleSave(btn, e) {
+      e.stopPropagation();
+      var icon = btn.querySelector('.bookmark-icon');
+      var bg = btn.querySelector('.save-bg');
+      var isSaved = icon.getAttribute('fill') === '#f59e0b';
+
+      if (!isSaved) {
+        icon.setAttribute('fill', '#f59e0b');
+        icon.setAttribute('stroke', '#f59e0b');
+        bg.className = "save-bg p-3 bg-amber-500/30 backdrop-blur-md rounded-full border border-amber-500/50 text-amber-400 transition-all";
+      } else {
+        icon.setAttribute('fill', 'none');
+        icon.setAttribute('stroke', 'currentColor');
+        bg.className = "save-bg p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white transition-all";
+      }
+    }
+
+    var lastTap = 0;
+    window.addEventListener('click', function(e) {
+      if (e.target.closest('button')) return;
+      var currentTime = new Date().getTime();
+      var tapLength = currentTime - lastTap;
+      if (tapLength < 300 && tapLength > 0) {
+        showLikeAnimation(e.clientX, e.clientY);
+      }
+      lastTap = currentTime;
+    });
+
+    function showLikeAnimation(x, y) {
+      var container = document.getElementById('anim-container');
+      var el = document.createElement('div');
+      el.className = 'heart-animation text-amber-300 font-bold text-3xl font-arabic drop-shadow-lg';
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      el.innerText = 'بِسْمِ ٱللَّهِ';
+      container.appendChild(el);
+      setTimeout(function() { el.remove(); }, 800);
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
