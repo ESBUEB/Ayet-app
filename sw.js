@@ -1,6 +1,6 @@
-const CACHE_NAME = 'ayet-app-v3';
+const CACHE_NAME = 'ayet-app-v4';
 
-// Kurulum: Eski önbellekleri sil ve hemen aktif ol
+// Yeni sürüm yüklendiğinde eski hafızayı anında siler
 self.addEventListener('install', function(event) {
   self.skipWaiting();
 });
@@ -11,7 +11,7 @@ self.addEventListener('activate', function(event) {
       return Promise.all(
         keys.map(function(key) {
           if (key !== CACHE_NAME) {
-            return caches.delete(key); // Eski 5 ayetli hafızayı tamamen siler
+            return caches.delete(key);
           }
         })
       );
@@ -21,15 +21,15 @@ self.addEventListener('activate', function(event) {
   );
 });
 
-// veri.csv dosyasını her zaman ÖNCE İNTERNETTEN (güncel sunucudan) çek
+// index.html ve veri.csv dosyalarını her zaman doğrudan güncel sunucudan (network-first) çeker
 self.addEventListener('fetch', function(event) {
-  if (event.request.url.indexOf('veri.csv') !== -1) {
+  if (event.request.mode === 'navigate' || event.request.url.indexOf('index.html') !== -1 || event.request.url.indexOf('veri.csv') !== -1) {
     event.respondWith(
       fetch(event.request)
         .then(function(response) {
-          var clonedResponse = response.clone();
+          var cloned = response.clone();
           caches.open(CACHE_NAME).then(function(cache) {
-            cache.put(event.request, clonedResponse);
+            cache.put(event.request, cloned);
           });
           return response;
         })
