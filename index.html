@@ -23,7 +23,7 @@
     }
     .font-arabic { font-family: 'Amiri', serif; }
     
-    /* Thunkable Native Scroll Snap Motoru */
+    /* Thunkable Scroll Snap Motoru */
     .snap-container {
       scroll-snap-type: y mandatory;
       overflow-y: scroll;
@@ -63,7 +63,7 @@
   <div id="feed" class="snap-container">
     <div id="loading-screen" class="h-screen w-screen flex flex-col items-center justify-center text-center p-6 text-amber-200">
       <div class="w-10 h-10 border-4 border-amber-300 border-t-transparent rounded-full animate-spin mb-4"></div>
-      <p class="text-sm font-medium tracking-wide">Ayet havuzu yükleniyor...</p>
+      <p class="text-sm font-medium tracking-wide">Ayetler yükleniyor...</p>
     </div>
   </div>
 
@@ -74,7 +74,7 @@
       navigator.serviceWorker.register('./sw.js').catch(function() {});
     }
 
-    var CSV_URL = "./veri.csv?v=" + new Date().getTime(); 
+    var CSV_URL = "./veri.csv"; 
 
     var BG_IMAGES = [
       "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1000",
@@ -86,6 +86,13 @@
       "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?q=80&w=1000",
       "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=1000",
       "https://images.unsplash.com/photo-1505118380757-91f5f5632de0?q=80&w=1000"
+    ];
+
+    // CSV bulunamazsa uygulamanın çökmesini önleyen yedek veri seti
+    var FALLBACK_DATA = [
+      { "Arapça Yazi": "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ", "Türkçe Yazı": "Rahmân ve Rahîm olan Allah'ın adıyla.", "Sure İsmi": "Fâtiha", "Ayet Numarası": "1" },
+      { "Arapça Yazi": "ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَٰلَمِينَ", "Türkçe Yazı": "Övgü, âlemlerin Rabbi Allah'adır.", "Sure İsmi": "Fâtiha", "Ayet Numarası": "2" },
+      { "Arapça Yazi": "إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ", "Türkçe Yazı": "Ancak sana kulluk eder, ancak senden yardım dileriz.", "Sure İsmi": "Fâtiha", "Ayet Numarası": "5" }
     ];
 
     var dataset = [];
@@ -107,45 +114,81 @@
     async function loadData() {
       try {
         var response = await fetch(CSV_URL);
-        if (!response.ok) throw new Error("veri.csv bulunamadı!");
+        if (!response.ok) throw new Error("veri.csv bulunamadı");
         var csvText = await response.text();
         
         Papa.parse(csvText, {
           header: true,
           skipEmptyLines: 'greedy',
           complete: function(results) {
-            dataset = (results.data || []).filter(function(row) {
+            var parsed = (results.data || []).filter(function(row) {
               return Object.values(row).some(function(v) { return v !== null && v !== "" && v !== undefined; });
             });
 
-            if (dataset && dataset.length > 0) {
-              rebuildDeck();
-              var loader = document.getElementById('loading-screen');
-              if (loader) loader.remove();
-              
-              var count = Math.min(6, dataset.length);
-              for (var i = 0; i < count; i++) {
-                appendCard();
-              }
-              isInitialLoaded = true;
+            if (parsed && parsed.length > 0) {
+              dataset = parsed;
+            } else {
+              dataset = FALLBACK_DATA;
             }
+            initApp();
+          },
+          error: function() {
+            dataset = FALLBACK_DATA;
+            initApp();
           }
         });
       } catch (error) {
-        console.error(error);
+        dataset = FALLBACK_DATA;
+        initApp();
       }
     }
 
-    // GÖRSELDEKİ TAM SÜTUN BAŞLIKLARINI HARİTALAMA (arabic_text, translation_text, surah_name_tr...)
+    function initApp() {
+      rebuildDeck();
+      var loader = document.getElementById('loading-screen');
+      if (loader) loader.remove();
+      
+      var count = Math.min(6, dataset.length);
+      for (var i = 0; i < count; i++) {
+        appendCard();
+      }
+      isInitialLoaded = true;
+    }
+
     function extractRowData(item) {
       if (!item) return { arabic: '', turkish: '', sure: '', ayet: '', kaynak: '' };
 
-      var arabic = item['arabic_text'] || item['Arapça Yazi'] || item['Arapca'] || '';
-      var turkish = item['translation_text'] || item['Türkçe Yazı'] || item['Meal'] || '';
-      var sure = item['surah_name_tr'] || item['Sure İsmi'] || item['Sure'] || '';
-      var ayet = item['verse_id'] || item['Ayet Numarası'] || item['Ayet'] || '';
-      var kaynak = item['translation_author'] || item['Kaynak'] || 'Kur\'an-ı Kerim';
+      var keys = Object.keys(item);
+      
+      if (keys.length === 1 && keys[0].indexOf(';') !== -1) {
+        var headers = keys[0].split(';');
+        var values = (item[keys[0]] || '').toString().split(';');
+        item = {};
+        for (var h = 0; h < headers.length; h++) {
+          item[headers[h].trim()] = values[h] ? values[h].trim() : '';
+        }
+        keys = Object.keys(item);
+      }
 
+      var arabic = '', turkish = '', sure = '', ayet = '', kaynak = '';
+
+      arabic = item['Arapça Yazi'] || item['Arapca Yazi'] || item['Arapça'] || item['Arapca'] || item['Arabic'] || '';
+      turkish = item['Türkçe Yazı'] || item['Türkçe Yazi'] || item['Turkce Yazi'] || item['Icerik'] || item['Meal'] || item['Turkish'] || item['Metin'] || '';
+      sure = item['Sure İsmi'] || item['Sure Ismi'] || item['Sure'] || item['Surah'] || '';
+      ayet = item['Ayet Numarası'] || item['Sure numarası'] || item['Ayet No'] || item['Ayet'] || item['Verse'] || '';
+      kaynak = item['Kaynak'] || item['Source'] || '';
+
+      if (!arabic || !turkish) {
+        for (var i = 0; i < keys.length; i++) {
+          var val = (item[keys[i]] || '').toString().trim();
+          if (!val) continue;
+          if (!arabic && /[\u0600-\u06FF]/.test(val)) {
+            arabic = val;
+          } else if (!turkish && val.length > 3 && val !== arabic) {
+            turkish = val;
+          }
+        }
+      }
       return { arabic: arabic, turkish: turkish, sure: sure, ayet: ayet, kaynak: kaynak };
     }
 
@@ -179,7 +222,7 @@
       var rawItem = getNextItem();
       var parsed = extractRowData(rawItem);
       var bgUrl = getRandomBg();
-      var sureInfo = parsed.sure ? parsed.sure + ' Suresi' + (parsed.ayet ? ', ' + parsed.ayet + '. Ayet' : '') : parsed.kaynak;
+      var sureInfo = parsed.sure ? parsed.sure + ' Suresi ' + (parsed.ayet ? ', ' + parsed.ayet + '. Ayet' : '') : (parsed.kaynak || 'Kur\'an-ı Kerim');
 
       var cardDiv = document.createElement('div');
       cardDiv.className = 'snap-card flex flex-col justify-between p-6 overflow-hidden bg-cover bg-center';
