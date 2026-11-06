@@ -22,7 +22,6 @@
       -webkit-tap-highlight-color: transparent;
     }
     
-    /* Arapça Yazı Yönü Koruması */
     .font-arabic { 
       font-family: 'Amiri', serif; 
       direction: rtl !important;
@@ -30,7 +29,6 @@
       text-align: center;
     }
     
-    /* Thunkable Scroll Snap Motoru */
     .snap-container {
       scroll-snap-type: y mandatory;
       overflow-y: scroll;
@@ -88,7 +86,7 @@
   <div id="feed" class="snap-container">
     <div id="loading-screen" class="h-screen w-screen flex flex-col items-center justify-center text-center p-6 text-amber-200">
       <div class="w-10 h-10 border-4 border-amber-300 border-t-transparent rounded-full animate-spin mb-4"></div>
-      <p class="text-sm font-medium tracking-wide">Ayetler yükleniyor...</p>
+      <p class="text-sm font-medium tracking-wide">Ayet havuzu yükleniyor...</p>
     </div>
   </div>
 
@@ -117,7 +115,7 @@
       navigator.serviceWorker.register('./sw.js').catch(function() {});
     }
 
-    var CSV_URL = "./veri.csv?v=" + new Date().getTime(); 
+    var CSV_URL = "./veri.csv?t=" + new Date().getTime(); 
 
     var BG_IMAGES = [
       "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1000",
@@ -127,86 +125,4 @@
       "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=1000",
       "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?q=80&w=1000",
       "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?q=80&w=1000",
-      "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=1000",
-      "https://images.unsplash.com/photo-1505118380757-91f5f5632de0?q=80&w=1000"
-    ];
-
-    var dataset = [];
-    var deck = [];
-    var lastBgIndex = -1;
-    var feedEl = document.getElementById('feed');
-    var isInitialLoaded = false;
-    var readCount = parseInt(localStorage.getItem('ayet_read_count') || '0', 10);
-    var savedVerses = JSON.parse(localStorage.getItem('ayet_saved_list') || '[]');
-
-    document.getElementById('read-counter').innerText = readCount;
-    updateSavedBadge();
-
-    function escapeHTML(str) {
-      if (!str) return '';
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-    }
-
-    async function loadData() {
-      try {
-        var response = await fetch(CSV_URL);
-        if (!response.ok) throw new Error("veri.csv okunamadı");
-        var csvText = await response.text();
-        
-        Papa.parse(csvText, {
-          header: true,
-          skipEmptyLines: 'greedy',
-          complete: function(results) {
-            dataset = (results.data || []).filter(function(row) {
-              return Object.values(row).some(function(v) { return v !== null && v !== "" && v !== undefined; });
-            });
-
-            if (dataset && dataset.length > 0) {
-              rebuildDeck();
-              var loader = document.getElementById('loading-screen');
-              if (loader) loader.remove();
-              
-              var count = Math.min(6, dataset.length);
-              for (var i = 0; i < count; i++) {
-                appendCard();
-              }
-              isInitialLoaded = true;
-            }
-          }
-        });
-      } catch (error) {
-        console.error(error);
-      }
-    }
-
-    // E-TABLONUZDAKİ SÜTUNLARA TAM UYUMLU AYRIŞTIRMA (arabic_text, translation_text, surah_name_tr, verse_id)
-    function extractRowData(item) {
-      if (!item) return { arabic: '', turkish: '', sure: '', ayet: '', kaynak: '' };
-
-      var keys = Object.keys(item);
-      
-      // Semicolon (;) Koruma Katmanı
-      if (keys.length === 1 && keys[0].indexOf(';') !== -1) {
-        var headers = keys[0].split(';');
-        var values = (item[keys[0]] || '').toString().split(';');
-        item = {};
-        for (var h = 0; h < headers.length; h++) {
-          item[headers[h].trim()] = values[h] ? values[h].trim() : '';
-        }
-        keys = Object.keys(item);
-      }
-
-      var arabic = item['arabic_text'] || item['Arapça Yazi'] || item['Arapca'] || '';
-      var turkish = item['translation_text'] || item['Türkçe Yazı'] || item['Meal'] || item['Icerik'] || '';
-      var sure = item['surah_name_tr'] || item['Sure İsmi'] || item['Sure'] || '';
-      var ayet = item['verse_id'] || item['Ayet Numarası'] || item['Ayet'] || '';
-      var kaynak = item['translation_author'] || item['Kaynak'] || 'Diyanet İşleri';
-
-      // Otomatik Tespit Yedeklemesi
-      if (!arabic || !turkish) {
-        for (var i =
+      "
