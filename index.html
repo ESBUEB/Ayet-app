@@ -84,11 +84,170 @@
   <div id="feed" class="snap-container">
     <div id="loading-screen" class="h-screen w-screen flex flex-col items-center justify-center text-center p-6 text-amber-200">
       <div class="w-10 h-10 border-4 border-amber-300 border-t-transparent rounded-full animate-spin mb-4"></div>
-      <p class="text-sm font-medium tracking-wide">Ayetler yükleniyor...</p>
+      <p class="text-sm font-medium tracking-wide">Yükleniyor...</p>
     </div>
   </div>
 
   <div id="anim-container" class="fixed inset-0 pointer-events-none z-50"></div>
 
   <!-- Kaydedilenler Modal -->
-  <div id="saved-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-
+  <div id="saved-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-lg hidden flex flex-col max-w-md mx-auto transition-opacity duration-300 opacity-0">
+    <div class="p-5 border-b border-white/10 flex items-center justify-between bg-black/60">
+      <div class="flex items-center space-x-2">
+        <svg class="w-5 h-5 fill-amber-400" viewBox="0 0 24 24">
+          <path d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
+        </svg>
+        <h2 class="text-lg font-bold text-amber-300 tracking-wide">Kaydedilen Ayetler</h2>
+      </div>
+      <button onclick="closeSavedModal()" class="p-2 bg-white/10 rounded-full text-white/80 active:scale-95 transition-all">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+    <div id="saved-list" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
+  </div>
+
+  <script>
+    // 1. TELEFONDAKİ TÜM SERVICE WORKER VE ÖNBELLEKLERİ ZORLA SİL
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (var registration of registrations) {
+          registration.unregister();
+        }
+      });
+    }
+    if (window.caches) {
+      caches.keys().then(function(names) {
+        for (var name of names) { caches.delete(name); }
+      });
+    }
+
+    function safeGet(key, def) {
+      try { var val = localStorage.getItem(key); return val !== null ? val : def; } catch (e) { return def; }
+    }
+    function safeSet(key, val) {
+      try { localStorage.setItem(key, val); } catch (e) {}
+    }
+
+    var CSV_URL = "./veri.csv?nocache=" + Date.now(); 
+
+    var BG_IMAGES = [
+      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1000",
+      "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=1000",
+      "https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1000",
+      "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=1000",
+      "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=1000",
+      "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?q=80&w=1000",
+      "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?q=80&w=1000",
+      "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=1000"
+    ];
+
+    var FALLBACK_DATA = [
+      { arabic_text: "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ", translation_text: "Rahmân ve Rahîm olan Allah'ın adıyla.", surah_name_tr: "Fâtiha", verse_id: "1", translation_author: "Diyanet İşleri" },
+      { arabic_text: "ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَٰلَمِينَ", translation_text: "Övgü, âlemlerin Rabbi Allah'adır.", surah_name_tr: "Fâtiha", verse_id: "2", translation_author: "Diyanet İşleri" },
+      { arabic_text: "إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ", translation_text: "Ancak sana kulluk eder, ancak senden yardım dileriz.", surah_name_tr: "Fâtiha", verse_id: "5", translation_author: "Diyanet İşleri" }
+    ];
+
+    var dataset = [];
+    var deck = [];
+    var lastBgIndex = -1;
+    var feedEl = document.getElementById('feed');
+    var isInitialLoaded = false;
+
+    var readCount = parseInt(safeGet('ayet_read_count', '0'), 10);
+    var savedVerses = [];
+    try { savedVerses = JSON.parse(safeGet('ayet_saved_list', '[]')); } catch(e) { savedVerses = []; }
+
+    document.getElementById('read-counter').innerText = readCount;
+    updateSavedBadge();
+
+    // 2. KESİN ZORUNLU KAPANMA TIMER'I (500ms SONRA EKRANI AÇAR)
+    var killLoaderTimer = setTimeout(function() {
+      if (!isInitialLoaded) {
+        dataset = FALLBACK_DATA;
+        startApp();
+      }
+    }, 500);
+
+    function parseCSV(text) {
+      if (!text) return [];
+      var lines = text.split(/\r\n|\n/);
+      if (lines.length < 2) return [];
+      var delim = (text.indexOf(';') !== -1 && text.indexOf(',') === -1) ? ';' : ',';
+      var headers = lines[0].split(delim).map(function(h) { return h.replace(/^"|"$/g, '').trim(); });
+      var list = [];
+      for (var i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        var cols = lines[i].split(delim);
+        var obj = {};
+        for (var j = 0; j < headers.length; j++) {
+          obj[headers[j]] = cols[j] ? cols[j].replace(/^"|"$/g, '').trim() : '';
+        }
+        list.push(obj);
+      }
+      return list;
+    }
+
+    function escapeHTML(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
+    async function loadData() {
+      try {
+        var response = await fetch(CSV_URL);
+        if (response.ok) {
+          var text = await response.text();
+          var parsed = parseCSV(text);
+          if (parsed && parsed.length > 0) {
+            dataset = parsed;
+          } else {
+            dataset = FALLBACK_DATA;
+          }
+        } else {
+          dataset = FALLBACK_DATA;
+        }
+      } catch (e) {
+        dataset = FALLBACK_DATA;
+      }
+      startApp();
+    }
+
+    function startApp() {
+      if (isInitialLoaded) return;
+      isInitialLoaded = true;
+      clearTimeout(killLoaderTimer);
+      
+      rebuildDeck();
+      var loader = document.getElementById('loading-screen');
+      if (loader) loader.remove();
+
+      var count = Math.min(6, dataset.length);
+      for (var i = 0; i < count; i++) {
+        appendCard();
+      }
+    }
+
+    function extractRowData(item) {
+      if (!item) return { arabic: '', turkish: '', sure: '', ayet: '', kaynak: '' };
+      var arabic = item['arabic_text'] || item['surah_name_ar'] || item['Arapça Yazi'] || item['Arapca'] || '';
+      var turkish = item['translation_text'] || item['Türkçe Yazı'] || item['Meal'] || item['Icerik'] || '';
+      var sure = item['surah_name_tr'] || item['Sure İsmi'] || item['Sure'] || '';
+      var ayet = item['verse_id'] || item['Ayet Numarası'] || item['Ayet'] || '';
+      var kaynak = item['translation_author'] || item['Kaynak'] || 'Kur\'an-ı Kerim';
+      return { arabic: arabic, turkish: turkish, sure: sure, ayet: ayet, kaynak: kaynak };
+    }
+
+    function rebuildDeck() {
+      deck = [];
+      for (var i = 0; i < dataset.length; i++) deck.push(i);
+      for (var j = deck.length - 1; j > 0; j--) {
+        var r = Math.floor(Math.random() * (j + 1));
+        var temp = deck[j];
+        deck[j] = deck[r];
+        deck[r] = temp;
+      }
+    }
+
+    function getNextItem() {
