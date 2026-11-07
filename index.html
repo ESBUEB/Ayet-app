@@ -39,7 +39,7 @@
 
     .snap-card {
       scroll-snap-align: start;
-      scroll-snap-stop: always;
+      scroll-snap-stop: normal;
       height: 100vh;
       width: 100vw;
       position: relative;
@@ -62,16 +62,16 @@
 </head>
 <body class="bg-black text-white select-none">
 
-  <!-- Üst Bar: Sayaç & Kaydedilenler -->
-  <div class="fixed top-0 left-0 right-0 z-40 flex items-center justify-between p-4 max-w-md mx-auto pointer-events-auto">
-    <div class="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-xs font-semibold text-amber-300 flex items-center space-x-1.5 shadow-lg">
+  <!-- Üst Bar: Sayaç & Kaydedilenler (Dokunma Engeli Kaldırıldı) -->
+  <div class="fixed top-0 left-0 right-0 z-40 flex items-center justify-between p-4 max-w-md mx-auto pointer-events-none">
+    <div class="pointer-events-auto bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-xs font-semibold text-amber-300 flex items-center space-x-1.5 shadow-lg">
       <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
       </svg>
       <span>Okunan: <strong id="read-counter" class="text-white">0</strong></span>
     </div>
 
-    <button onclick="openSavedModal()" class="bg-black/50 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/10 text-xs font-semibold text-amber-300 flex items-center space-x-1.5 active:scale-95 transition-all shadow-lg">
+    <button onclick="openSavedModal()" class="pointer-events-auto bg-black/50 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/10 text-xs font-semibold text-amber-300 flex items-center space-x-1.5 active:scale-95 transition-all shadow-lg">
       <svg class="w-4 h-4 fill-amber-400 stroke-none" viewBox="0 0 24 24">
         <path d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
       </svg>
@@ -109,12 +109,9 @@
   </div>
 
   <script>
-    // 1. TELEFONDAKİ TÜM SERVICE WORKER VE ÖNBELLEKLERİ ZORLA SİL
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for (var registration of registrations) {
-          registration.unregister();
-        }
+        for (var registration of registrations) { registration.unregister(); }
       });
     }
     if (window.caches) {
@@ -154,6 +151,7 @@
     var lastBgIndex = -1;
     var feedEl = document.getElementById('feed');
     var isInitialLoaded = false;
+    var maxReachedIndex = 0;
 
     var readCount = parseInt(safeGet('ayet_read_count', '0'), 10);
     var savedVerses = [];
@@ -162,7 +160,6 @@
     document.getElementById('read-counter').innerText = readCount;
     updateSavedBadge();
 
-    // 2. KESİN ZORUNLU KAPANMA TIMER'I (500ms SONRA EKRANI AÇAR)
     var killLoaderTimer = setTimeout(function() {
       if (!isInitialLoaded) {
         dataset = FALLBACK_DATA;
@@ -279,7 +276,7 @@
 
       var htmlContent = '' +
         '<div class="absolute inset-0 bg-overlay"></div>' +
-        '<div class="absolute right-4 bottom-28 z-30 flex flex-col items-center space-y-6">' +
+        '<div class="absolute right-4 bottom-28 z-30 flex flex-col items-center space-y-6 pointer-events-auto">' +
           '<button onclick="toggleLike(this, event)" class="flex flex-col items-center space-y-1 group focus:outline-none">' +
             '<div class="like-bg p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white transition-all">' +
               '<svg class="heart-icon w-6 h-6 fill-none stroke-current stroke-2 transition-colors" viewBox="0 0 24 24">' +
@@ -315,7 +312,7 @@
             '<div class="text-sm font-semibold text-white/75 bg-black/30 backdrop-blur-sm py-1.5 px-4 rounded-lg inline-block border border-white/5">' +
               escapeHTML(sureInfo) +
             '</div>' +
-            '<p class="text-[10px] text-white/40 tracking-wider">Aşağı kaydırın • Çift tıkla</p>' +
+            '<p class="text-[10px] text-white/40 tracking-wider">Yukarı / Aşağı kaydırın • Çift tıkla</p>' +
           '</div>' +
         '</div>';
 
@@ -324,16 +321,18 @@
       feedEl.appendChild(cardDiv);
     }
 
-    var lastScrollIndex = 0;
     feedEl.addEventListener('scroll', function() {
       if (!isInitialLoaded) return;
       var currentIndex = Math.round(feedEl.scrollTop / (feedEl.clientHeight || 1));
-      if (currentIndex > lastScrollIndex) {
-        readCount += (currentIndex - lastScrollIndex);
-        lastScrollIndex = currentIndex;
+      
+      // Sadece daha önce geçilmemiş yeni karta gelindiğinde sayacı arttır
+      if (currentIndex > maxReachedIndex) {
+        readCount += (currentIndex - maxReachedIndex);
+        maxReachedIndex = currentIndex;
         document.getElementById('read-counter').innerText = readCount;
         safeSet('ayet_read_count', readCount.toString());
       }
+      
       if (feedEl.scrollTop + feedEl.clientHeight >= feedEl.scrollHeight - (feedEl.clientHeight * 2)) {
         appendCard();
       }
